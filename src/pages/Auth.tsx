@@ -5,8 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Package, Mail, Lock, ArrowRight, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Package, Mail, Lock, ArrowRight, Shield, Eye, EyeOff, ArrowLeft, HeartHandshake, User } from 'lucide-react';
 import { z } from 'zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -16,7 +23,7 @@ type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
 const Auth: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, signIn, signUp, signInWithGoogle, resetPassword, updatePassword } = useAuth();
+  const { user, signIn, signUp, signInWithGoogle, resetPassword, updatePassword, setIsPartner } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,6 +31,8 @@ const Auth: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [isProcessingAuth, setIsProcessingAuth] = useState(false);
 
   useEffect(() => {
     // Check if this is a password reset callback
@@ -34,10 +43,11 @@ const Auth: React.FC = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    if (user && mode !== 'reset') {
+    // Only auto-redirect if NOT showing the partner selection modal AND not currently processing a login
+    if (user && mode !== 'reset' && !showPartnerModal && !isProcessingAuth) {
       navigate('/dashboard');
     }
-  }, [user, navigate, mode]);
+  }, [user, navigate, mode, showPartnerModal, isProcessingAuth]);
 
   const validateEmail = () => {
     try {
@@ -71,6 +81,12 @@ const Auth: React.FC = () => {
     return true;
   };
 
+  const handlePartnerChoice = (choice: boolean) => {
+    setIsPartner(choice);
+    setShowPartnerModal(false);
+    navigate('/dashboard');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -78,8 +94,10 @@ const Auth: React.FC = () => {
       if (!validateEmail()) return;
       
       setLoading(true);
+      setIsProcessingAuth(true);
       const { error } = await resetPassword(email);
       setLoading(false);
+      setIsProcessingAuth(false);
 
       if (error) {
         toast.error(error.message);
@@ -107,8 +125,10 @@ const Auth: React.FC = () => {
       }
 
       setLoading(true);
+      setIsProcessingAuth(true);
       const { error } = await updatePassword(password);
       setLoading(false);
+      setIsProcessingAuth(false);
 
       if (error) {
         toast.error(error.message);
@@ -123,12 +143,14 @@ const Auth: React.FC = () => {
     if (!validateForm()) return;
 
     setLoading(true);
+    setIsProcessingAuth(true);
 
     if (mode === 'login') {
-      const { error } = await signIn(email, password);
-      setLoading(false);
-
+      const { error } = await signIn(email.trim(), password);
+      
       if (error) {
+        setLoading(false);
+        setIsProcessingAuth(false);
         if (error.message.includes('Invalid login credentials')) {
           toast.error('Invalid email or password');
         } else {
@@ -137,13 +159,15 @@ const Auth: React.FC = () => {
         return;
       }
 
+      setShowPartnerModal(true);
+      setIsProcessingAuth(false);
       toast.success('Welcome back!');
-      navigate('/dashboard');
     } else {
-      const { error } = await signUp(email, password);
-      setLoading(false);
-
+      const { error } = await signUp(email.trim(), password);
+      
       if (error) {
+        setLoading(false);
+        setIsProcessingAuth(false);
         if (error.message.includes('already registered')) {
           toast.error('This email is already registered. Please login instead.');
           setMode('login');
@@ -153,8 +177,9 @@ const Auth: React.FC = () => {
         return;
       }
 
+      setShowPartnerModal(true);
+      setIsProcessingAuth(false);
       toast.success('Account created successfully!');
-      navigate('/dashboard');
     }
   };
 
@@ -188,6 +213,41 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
+      {/* Partner Selection Modal */}
+      <Dialog open={showPartnerModal} onOpenChange={setShowPartnerModal}>
+        <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-display font-bold text-center">Become a Zipzy Partner</DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground pt-2">
+              Earn rewards by helping others with deliveries or small campus tasks.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-4 py-6">
+            <Button 
+              onClick={() => handlePartnerChoice(true)}
+              className="h-20 flex flex-col items-center justify-center gap-2 group hover:scale-[1.02] transition-all"
+            >
+              <HeartHandshake className="w-6 h-6 group-hover:animate-pulse" />
+              <div className="flex flex-col">
+                <span className="font-bold">Become Partner</span>
+                <span className="text-xs font-normal opacity-70">I want to deliver and earn</span>
+              </div>
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => handlePartnerChoice(false)}
+              className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 hover:scale-[1.02] transition-all"
+            >
+              <User className="w-6 h-6" />
+              <div className="flex flex-col">
+                <span className="font-bold">Continue as User</span>
+                <span className="text-xs font-normal opacity-70">I just want to request items</span>
+              </div>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-foreground relative overflow-hidden">
         {/* Abstract shapes */}
