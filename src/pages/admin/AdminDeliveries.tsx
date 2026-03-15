@@ -30,15 +30,15 @@ import {
 
 interface Delivery {
   id: string;
+  item_name?: string;
   item_description: string;
   pickup_city: string;
   drop_city: string;
   status: string;
   urgency: string;
-  estimated_fare: number | null;
+  reward: number | null;
   created_at: string;
-  user_id: string;
-  partner_id: string | null;
+  buyer_id: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -62,7 +62,7 @@ export const AdminDeliveries = () => {
       setLoading(true);
       try {
         let query = supabase
-          .from('delivery_requests')
+          .from('requests')
           .select('*')
           .order('created_at', { ascending: false });
 
@@ -154,7 +154,7 @@ export const AdminDeliveries = () => {
                       <div className="flex items-center gap-2">
                         <Package className="w-4 h-4 text-muted-foreground" />
                         <span className="font-medium truncate max-w-[200px]">
-                          {delivery.item_description}
+                          {delivery.item_name || delivery.item_description}
                         </span>
                       </div>
                     </TableCell>
@@ -172,7 +172,7 @@ export const AdminDeliveries = () => {
                       <Badge variant="outline">{delivery.urgency}</Badge>
                     </TableCell>
                     <TableCell>
-                      {delivery.estimated_fare ? `₹${delivery.estimated_fare}` : '-'}
+                      {delivery.reward ? `₹${delivery.reward}` : '-'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(delivery.created_at), 'MMM d, yyyy')}
@@ -204,7 +204,7 @@ export const AdminDeliveries = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Item</p>
-                  <p className="font-medium">{selectedDelivery.item_description}</p>
+                  <p className="font-medium">{selectedDelivery.item_name || selectedDelivery.item_description}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
@@ -226,7 +226,7 @@ export const AdminDeliveries = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Estimated Fare</p>
-                  <p className="font-medium">₹{selectedDelivery.estimated_fare || 0}</p>
+                  <p className="font-medium">₹{selectedDelivery.reward || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Created</p>
@@ -235,8 +235,8 @@ export const AdminDeliveries = () => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Partner Assigned</p>
-                  <p className="font-medium">{selectedDelivery.partner_id ? 'Yes' : 'No'}</p>
+                  <p className="text-sm text-muted-foreground">Buyer ID</p>
+                  <p className="font-medium">{selectedDelivery.buyer_id}</p>
                 </div>
               </div>
               <div className="pt-4 border-t">

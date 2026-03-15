@@ -14,7 +14,7 @@ export const useChat = (deliveryId: string | null) => {
 
   // Fetch initial messages
   useEffect(() => {
-    if (!deliveryRequestId) {
+    if (!deliveryId) {
       setMessages([]);
       setLoading(false);
       return;
@@ -131,7 +131,7 @@ export const useChat = (deliveryId: string | null) => {
       setSending(false);
       return { error };
     },
-    [deliveryRequestId, user]
+    [deliveryId, user]
   );
 
   const unreadCount = messages.filter(

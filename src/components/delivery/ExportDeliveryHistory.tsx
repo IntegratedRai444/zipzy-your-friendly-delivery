@@ -12,7 +12,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type DeliveryRequest = Database['public']['Tables']['requests']['Row'];
 
 interface ExportDeliveryHistoryProps {
   deliveries: DeliveryRequest[];
@@ -36,10 +36,10 @@ export const ExportDeliveryHistory: React.FC<ExportDeliveryHistoryProps> = ({ de
     pickupCity: delivery.pickup_city,
     dropCity: delivery.drop_city,
     status: statusLabels[delivery.status] || delivery.status,
-    fare: `₹${delivery.estimated_fare || 0}`,
+    fare: `₹${delivery.reward || 0}`,
     createdAt: format(new Date(delivery.created_at), 'MMM d, yyyy'),
-    deliveredAt: delivery.delivered_at 
-      ? format(new Date(delivery.delivered_at), 'MMM d, yyyy') 
+    deliveredAt: delivery.status === 'delivered' 
+      ? format(new Date(delivery.updated_at), 'MMM d, yyyy') 
       : '-',
   });
 
@@ -111,7 +111,7 @@ export const ExportDeliveryHistory: React.FC<ExportDeliveryHistoryProps> = ({ de
       const completedCount = deliveries.filter(d => d.status === 'delivered').length;
       const totalSpent = deliveries
         .filter(d => d.status === 'delivered')
-        .reduce((sum, d) => sum + (d.estimated_fare || 0), 0);
+        .reduce((sum, d) => sum + (d.reward || 0), 0);
 
       doc.setFontSize(10);
       doc.setTextColor(0);

@@ -38,28 +38,43 @@ const PartnerOnboarding: React.FC = () => {
           phone: formData.phone,
           city: formData.college,
           address: formData.hostel,
-          // Note: upi_id is not in schema, so we skip or could use delivery_instructions as a fallback if needed
         })
         .eq('id', user.id);
 
       if (userError) throw userError;
 
+      // Update profiles table too (for Admin compatibility)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          phone: formData.phone,
+          city: formData.college,
+          address: formData.hostel,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0]
+        })
+        .eq('user_id', user.id);
+
+      if (profileError) throw profileError;
+
       // 2. Set role to partner in DB (this also updates local state)
       await setIsPartner(true);
 
-      // 3. Initialize carrier availability
+      // 3. Initialize partner_locations (replaces carrier_availability)
       const { error: carrierError } = await supabase
-        .from('carrier_availability')
+        .from('partner_locations')
         .upsert({
-          user_id: user.id,
+          partner_id: user.id,
           max_detour_km: parseFloat(formData.radius),
           is_online: true,
-        }, { onConflict: 'user_id' });
+          latitude: 0,
+          longitude: 0,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'partner_id' });
 
       if (carrierError) throw carrierError;
 
       toast.success('Partner onboarding completed!');
-      navigate('/dashboard');
+      navigate('/');
     } catch (error: any) {
       console.error('Onboarding error:', error);
       toast.error(error.message || 'Something went wrong');

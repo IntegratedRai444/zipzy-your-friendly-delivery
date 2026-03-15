@@ -17,7 +17,10 @@ import { ShoppingBag, MapPin, History, Shield, LogOut, ArrowLeft, Star, Wallet, 
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type DeliveryRequest = Database['public']['Tables']['requests']['Row'];
+type Delivery = Database['public']['Tables']['deliveries']['Row'] & {
+  requests: Database['public']['Tables']['requests']['Row'] | null;
+};
 
 const PartnerMode: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -26,7 +29,7 @@ const PartnerMode: React.FC = () => {
   const { activeDeliveries, completedDeliveries, acceptRequest, updateStatus, refetch } = useCarrierDeliveries();
   const { trustScore, loading: trustLoading } = useTrustScore();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
-  const [ratingDelivery, setRatingDelivery] = useState<DeliveryRequest | null>(null);
+  const [ratingDelivery, setRatingDelivery] = useState<Delivery | null>(null);
 
   const handleAccept = async (id: string) => {
     setAcceptingId(id);
@@ -41,7 +44,7 @@ const PartnerMode: React.FC = () => {
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
+              <Link to="/requests">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>

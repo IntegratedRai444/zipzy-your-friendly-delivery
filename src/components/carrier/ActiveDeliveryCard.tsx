@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Package, MapPin, MessageCircle, CheckCircle, Truck, Navigation, Key, Upload } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Package, MapPin, MessageCircle, CheckCircle, Truck, Navigation, Key, Upload, Clock } from 'lucide-react';
 import { ChatSheet } from '@/components/chat/ChatSheet';
 import { TrackingButton } from '@/components/tracking/TrackingButton';
 import { OTPVerificationDialog } from '@/components/delivery/OTPVerificationDialog';
@@ -35,6 +36,7 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
   const [chatOpen, setChatOpen] = useState(false);
   const [otpDialogOpen, setOtpDialogOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<DeliveryStatus | null>(null);
+  const [eta, setEta] = useState<string | null>(null);
   const config = statusConfig[delivery.status] || statusConfig.matched;
   
   const { tracking, startTracking, stopTracking } = useLocationTracking({
@@ -42,10 +44,29 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
     isPartner: true,
   });
 
+  const fetchETA = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/deliveries/${delivery.id}/eta`, {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      });
+      const result = await response.json();
+      if (result.success) {
+        setEta(result.data.estimated_arrival);
+      }
+    } catch (err) {
+      console.error('Failed to fetch ETA:', err);
+    }
+  };
+
   // Auto-start tracking when in transit
   useEffect(() => {
     if (delivery.status === 'in_transit' && !tracking) {
       startTracking();
+      fetchETA();
+      const interval = setInterval(fetchETA, 30000);
+      return () => clearInterval(interval);
     }
   }, [delivery.status, tracking, startTracking]);
 
@@ -66,8 +87,16 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
             </div>
           </div>
           
-          <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
-            {config.label}
+          <div className="flex gap-2 items-center">
+            {eta && (
+              <div className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-medium flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                ETA: {eta}
+              </div>
+            )}
+            <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
+              {config.label}
+            </div>
           </div>
         </div>
 
@@ -96,10 +125,26 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
           </div>
         </div>
 
-        {/* Fare */}
-        <div className="flex items-center justify-between p-3 rounded-xl bg-muted mb-4">
-          <span className="text-sm text-muted-foreground">Your Earnings</span>
-          <span className="font-semibold text-lg">₹{delivery.requests?.reward || 0}</span>
+        {/* Fare Breakdown */}
+        <div className="space-y-2 p-3 rounded-xl bg-muted mb-4 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Estimated Item Price</span>
+            <span>₹{delivery.requests?.estimated_price || 0}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Delivery Reward</span>
+            <span>₹{delivery.requests?.reward || 0}</span>
+          </div>
+          <div className="flex justify-between text-destructive">
+            <span className="text-muted-foreground">Platform Fee (20%)</span>
+            <span>-₹{delivery.requests?.platform_fee || 0}</span>
+          </div>
+          <div className="pt-2 border-t border-border flex justify-between font-bold">
+            <span>Estimated Total Payout</span>
+            <span className="text-primary text-lg">
+              ₹{(parseFloat(delivery.requests?.estimated_price as any || 0) + (parseFloat(delivery.requests?.reward as any || 0) * 0.8)).toFixed(2)}
+            </span>
+          </div>
         </div>
 
         {/* Actions */}

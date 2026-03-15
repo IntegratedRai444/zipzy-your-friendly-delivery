@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { 
   ShoppingBag, MapPin, ArrowRight, ArrowLeft, Clock, CheckCircle, 
-  IndianRupee, Info, Sparkles, Timer, Calendar, Map, Tag
+  IndianRupee, Info, Sparkles, Timer, Calendar, Map, Tag, Loader2
 } from 'lucide-react';
 import { z } from 'zod';
 import { PromoCodeInput } from '@/components/promo/PromoCodeInput';
@@ -53,6 +53,7 @@ const CreateRequest: React.FC = () => {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   
   // Form data
   const [formData, setFormData] = useState<Partial<RequestFormData>>({
@@ -66,6 +67,45 @@ const CreateRequest: React.FC = () => {
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+
+  const handleAISuggest = async () => {
+    if (!formData.item_description || formData.item_description.length < 5) {
+      toast.info('Please enter a more detailed description for AI to analyze');
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const parseRes = await api.post('/requests/parse', { message: formData.item_description });
+      if (parseRes.success && parseRes.data) {
+        const { item_name, category, brand, is_fragile } = parseRes.data;
+        
+        // Update fields
+        if (brand) {
+          setWantSpecificBrand(true);
+          updateField('brand_name', brand);
+        }
+
+        // Get estimation
+        const estimateRes = await api.post('/requests/estimate', { item_name, category });
+        if (estimateRes.success && estimateRes.data) {
+          const { suggested_price, suggested_reward } = estimateRes.data;
+          
+          if (suggested_price) {
+            setWantBudgetLimit(true);
+            updateField('max_budget', suggested_price);
+          }
+          
+          toast.success(`AI suggested a budget of ₹${suggested_price} and reward of ₹${suggested_reward}`);
+        }
+      }
+    } catch (error) {
+      console.error('AI Analysis failed:', error);
+      toast.error('AI assistant is currently resting. Please fill in details manually.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const updateField = (field: keyof RequestFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -217,8 +257,25 @@ const CreateRequest: React.FC = () => {
                 <p className="text-muted-foreground">Tell us what you need, a partner will buy it for you</p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Product name or description</Label>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="description">Product name or description</Label>
+                  <Button
+                    type="button"
+                    variant="ghost" 
+                    size="sm"
+                    className="h-8 text-primary hover:text-primary/80 gap-1.5"
+                    onClick={handleAISuggest}
+                    disabled={analyzing}
+                  >
+                    {analyzing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    Magic Suggest
+                  </Button>
+                </div>
                 <Textarea
                   id="description"
                   placeholder="e.g., USB-C charger, Milk packet, Paracetamol tablets..."

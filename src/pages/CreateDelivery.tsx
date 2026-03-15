@@ -31,18 +31,7 @@ const deliverySchema = z.object({
 
 type DeliveryFormData = z.infer<typeof deliverySchema>;
 
-const URGENCY_PRICES = {
-  standard: 50,
-  express: 100,
-  urgent: 200,
-};
 
-const SIZE_MULTIPLIERS = {
-  small: 1,
-  medium: 1.5,
-  large: 2,
-  extra_large: 3,
-};
 
 const CreateDelivery: React.FC = () => {
   const navigate = useNavigate();
@@ -54,17 +43,35 @@ const CreateDelivery: React.FC = () => {
     urgency: 'standard',
   });
 
-  const calculateFare = () => {
-    const basePrice = URGENCY_PRICES[formData.urgency || 'standard'];
-    const sizeMultiplier = SIZE_MULTIPLIERS[formData.item_size || 'small'];
-    return Math.round(basePrice * sizeMultiplier);
-  };
+  const [priceData, setPriceData] = useState<{ reward: number; platform_fee: number; total_price: number } | null>(null);
 
   const updateField = (field: keyof DeliveryFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleNext = () => {
+  const fetchEstimate = async () => {
+    try {
+      setLoading(true);
+      const res = await api.post('/requests/estimate', {
+        pickup_location: formData.pickup_address || '',
+        drop_location: formData.drop_address || '',
+        item_size: formData.item_size || 'small',
+        urgency: formData.urgency || 'standard',
+      });
+      if (res.data?.success) {
+        setPriceData(res.data.data);
+      }
+    } catch (e) {
+      toast.error('Failed to calculate exact fare');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNext = async () => {
+    if (step === 3) {
+      await fetchEstimate();
+    }
     if (step < 4) setStep(step + 1);
   };
 
@@ -89,9 +96,9 @@ const CreateDelivery: React.FC = () => {
         drop_phone: validated.drop_phone,
         drop_instructions: validated.drop_instructions || null,
         urgency: validated.urgency,
-        reward: calculateFare(),
+        reward: priceData?.reward || 15,
         item_value: 0,
-        platform_fee: 0,
+        platform_fee: priceData?.platform_fee || 3,
       });
       
       toast.success('Delivery request created successfully!');
@@ -402,14 +409,21 @@ const CreateDelivery: React.FC = () => {
               </div>
 
               <div className="p-6 rounded-2xl border-2 border-primary bg-primary/5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Estimated Fare</p>
-                    <p className="text-3xl font-bold">₹{calculateFare()}</p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Delivery Reward</span>
+                    <span>₹{priceData?.reward || 15}</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Pay on delivery</p>
-                    <p className="text-sm font-medium text-primary">Cash / UPI accepted</p>
+                  <div className="flex items-center justify-between text-muted-foreground pb-2 border-b border-border/50">
+                    <span>Platform Fee (20%)</span>
+                    <span>₹{priceData?.platform_fee || 3}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <p className="font-semibold text-foreground">Total Fare</p>
+                      <p className="text-xs text-primary">Pay on delivery</p>
+                    </div>
+                    <p className="text-3xl font-bold">₹{priceData?.total_price || 18}</p>
                   </div>
                 </div>
               </div>

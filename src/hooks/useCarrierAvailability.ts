@@ -5,7 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
 type CarrierAvailability = Database['public']['Tables']['partner_locations']['Row'];
-type ItemSize = Database['public']['Enums']['item_size'];
 
 interface CarrierSettings {
   maxDetourKm: number;
@@ -35,49 +34,86 @@ export const useCarrierAvailability = () => {
     setLoading(false);
   }, [user]);
 
+  // Ensure a partner_locations row always exists when this hook loads
+  const ensureRowExists = useCallback(async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('partner_locations')
+      .upsert(
+        {
+          partner_id: user.id,
+          is_online: false,
+          latitude: 0,
+          longitude: 0,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'partner_id', ignoreDuplicates: true }
+      )
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error ensuring partner_locations row:', error);
+    } else if (data && !availability) {
+      setAvailability(data);
+    }
+  }, [user, availability]);
+
   useEffect(() => {
-    fetchAvailability();
+    const init = async () => {
+      await fetchAvailability();
+    };
+    init();
   }, [fetchAvailability]);
+
+  // After fetch, ensure the row exists (idempotent upsert)
+  useEffect(() => {
+    if (!loading && user) {
+      ensureRowExists();
+    }
+  }, [loading, user, ensureRowExists]);
 
   const toggleOnline = async () => {
     if (!user) return;
     setUpdating(true);
 
+    const newOnlineState = !(availability?.is_online ?? false);
+
     try {
-      if (availability) {
-        const { error } = await supabase
-          .from('partner_locations')
-          .update({ is_online: !availability.is_online, updated_at: new Date().toISOString() })
-          .eq('partner_id', user.id);
+      console.log('[Zipzy] Toggling online state for partner:', user.id, '→', newOnlineState);
 
-        if (error) throw error;
-        setAvailability({ ...availability, is_online: !availability.is_online });
-        toast({
-          title: !availability.is_online ? 'You are now online' : 'You are now offline',
-          description: !availability.is_online 
-            ? 'You can now receive delivery requests' 
-            : 'You will not receive new requests',
-        });
-      } else {
-        // Create initial availability record
-        const { data, error } = await supabase
-          .from('partner_locations')
-          .insert({ partner_id: user.id, is_online: true, latitude: 0, longitude: 0 }) // Lat/Lng are required in types.ts
-          .select()
-          .single();
+      const { data, error } = await supabase
+        .from('partner_locations')
+        .upsert(
+          {
+            partner_id: user.id,
+            is_online: newOnlineState,
+            latitude: availability?.latitude ?? 0,
+            longitude: availability?.longitude ?? 0,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'partner_id' }
+        )
+        .select()
+        .single();
 
-        if (error) throw error;
-        setAvailability(data);
-        toast({
-          title: 'You are now online',
-          description: 'You can now receive delivery requests',
-        });
-      }
-    } catch (error) {
-      console.error('Error toggling online status:', error);
+      console.log('[Zipzy] Toggle result:', data, error);
+
+      if (error) throw error;
+
+      setAvailability(data);
+      toast({
+        title: newOnlineState ? '✅ You are now Online' : '🔴 You are now Offline',
+        description: newOnlineState
+          ? 'You can now receive delivery requests'
+          : 'You will not receive new requests',
+      });
+    } catch (error: any) {
+      console.error('[Zipzy] Error toggling online status:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update status',
+        description: error?.message || 'Failed to update online status',
         variant: 'destructive',
       });
     } finally {
@@ -90,39 +126,34 @@ export const useCarrierAvailability = () => {
     setUpdating(true);
 
     try {
-      const updateData = {
-        max_detour_km: settings.maxDetourKm ?? availability?.max_detour_km,
-        updated_at: new Date().toISOString(),
-      };
+      const { data, error } = await supabase
+        .from('partner_locations')
+        .upsert(
+          {
+            partner_id: user.id,
+            is_online: availability?.is_online ?? false,
+            latitude: availability?.latitude ?? 0,
+            longitude: availability?.longitude ?? 0,
+            max_detour_km: settings.maxDetourKm ?? (availability as any)?.max_detour_km,
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'partner_id' }
+        )
+        .select()
+        .single();
 
-      if (availability) {
-        const { error } = await supabase
-          .from('partner_locations')
-          .update(updateData)
-          .eq('partner_id', user.id);
+      if (error) throw error;
 
-        if (error) throw error;
-        setAvailability({ ...availability, ...updateData } as CarrierAvailability);
-      } else {
-        const { data, error } = await supabase
-          .from('partner_locations')
-          .insert({ partner_id: user.id, ...updateData, latitude: 0, longitude: 0 })
-          .select()
-          .single();
-
-        if (error) throw error;
-        setAvailability(data);
-      }
-
+      setAvailability(data);
       toast({
         title: 'Settings updated',
         description: 'Your carrier preferences have been saved',
       });
-    } catch (error) {
-      console.error('Error updating settings:', error);
+    } catch (error: any) {
+      console.error('[Zipzy] Error updating settings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update settings',
+        description: error?.message || 'Failed to update settings',
         variant: 'destructive',
       });
     } finally {

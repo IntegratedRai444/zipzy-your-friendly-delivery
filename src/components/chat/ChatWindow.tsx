@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X } from 'lucide-react';
+import { Send, X, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useChat } from '@/hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChatWindowProps {
   deliveryRequestId: string;
@@ -27,11 +28,42 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const [analyzing, setAnalyzing] = useState(false);
+
   const handleSend = async () => {
     if (!input.trim() || sending) return;
     const message = input;
     setInput('');
     await sendMessage(message);
+  };
+
+  const callAIAssistant = async () => {
+    if (!input.trim() || analyzing) return;
+    const message = input;
+    setInput('');
+    setAnalyzing(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/assistant`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({ 
+          message,
+          context: { delivery_id: deliveryRequestId }
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        // AI message is usually sent as a 'system' or 'assistant' message which hook should pick up
+        // But for UI feedback, we can toast or just wait for message to appear via realtime info
+      }
+    } catch (err) {
+      console.error('AI Assistant failed:', err);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -90,6 +122,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             className="flex-1"
             disabled={sending}
           />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={callAIAssistant} 
+            disabled={!input.trim() || analyzing}
+            className="text-primary hover:text-primary/80"
+          >
+            {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          </Button>
           <Button onClick={handleSend} disabled={!input.trim() || sending} size="icon">
             <Send className="w-4 h-4" />
           </Button>

@@ -35,22 +35,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserRole = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'partner')
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
         .single();
       
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching user role:', error);
+      if (error && error.code !== 'PGRST116' && !error.message.includes('406')) {
+        console.error('Error fetching user profile:', error);
       }
       
-      const hasPartnerRole = !!data;
+      const hasPartnerRole = !!(profile && (profile as any).is_partner_onboarded);
       setIsPartner(hasPartnerRole);
+      // Ensure local storage is in sync
       localStorage.setItem('isPartner', hasPartnerRole.toString());
     } catch (err) {
-      console.error('Catch error fetching user role:', err);
+      console.error('Catch error fetching user profile:', err);
+      // Fallback to local storage if DB fetch fails
+      const stored = localStorage.getItem('isPartner');
+      if (stored !== null) {
+        setIsPartner(stored === 'true');
+      }
     }
   };
 
@@ -59,14 +64,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('isPartner', value.toString());
 
     if (user) {
-      const role = value ? 'partner' : 'buyer';
-      // Upsert role in DB
+      // Update partner status in DB
       const { error } = await supabase
-        .from('user_roles')
-        .upsert({ user_id: user.id, role: role }, { onConflict: 'user_id,role' });
+        .from('users')
+        .update({ is_partner_onboarded: value } as any)
+        .eq('id', user.id);
       
       if (error) {
-        console.error('Error updating user role:', error);
+        console.error('Error updating partner status:', error);
       }
     }
   };

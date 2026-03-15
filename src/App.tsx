@@ -26,6 +26,7 @@ import PartnerOnboarding from "./pages/PartnerOnboarding";
 import PartnerMode from "./pages/PartnerMode";
 import PartnerEarnings from "./pages/PartnerEarnings";
 import PartnerTrips from "./pages/PartnerTrips";
+import { GlobalAIChat } from "@/components/chat/GlobalAIChat";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
+        <GlobalAIChat />
         <BrowserRouter
           future={{
             v7_startTransition: true,

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, ArrowRight, Play, Star } from "lucide-react";
+import { ShoppingBag, ArrowRight } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import heroIllustration from "@/assets/hero-illustration.png";
@@ -82,36 +82,6 @@ const HeroSection = () => {
                 </Button>
               )}
             </div>
-
-            {/* Social proof */}
-            <div 
-              className="flex items-center gap-6 pt-6 opacity-0 animate-fade-in stagger-5"
-            >
-              {/* Avatar stack */}
-              <div className="flex -space-x-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div
-                    key={i}
-                    className="w-10 h-10 rounded-full border-2 border-background bg-muted flex items-center justify-center text-xs font-medium"
-                  >
-                    {String.fromCharCode(64 + i)}
-                  </div>
-                ))}
-                <div className="w-10 h-10 rounded-full border-2 border-background bg-foreground text-primary-foreground flex items-center justify-center text-xs font-semibold">
-                  +5K
-                </div>
-              </div>
-              <div className="border-l border-border pl-6">
-                <div className="flex items-center gap-1 mb-1">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className="w-4 h-4 fill-foreground text-foreground" />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">4.9/5</span> from 2,400+ requests
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* Right illustration */}
@@ -130,38 +100,9 @@ const HeroSection = () => {
                   {/* Gradient overlay */}
                   <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-background/20 to-transparent" />
                 </div>
-                
-
-
-
-
-                {/* Stats pill */}
-                <div 
-                  className="absolute -bottom-4 left-1/2 -translate-x-1/2 glass-dark rounded-full px-6 py-3 shadow-lg"
-                >
-                  <div className="flex items-center gap-6 text-white">
-                    <div className="text-center">
-                      <p className="font-display font-bold">50K+</p>
-                      <p className="text-xs text-white/60">Requests</p>
-                    </div>
-                    <div className="w-px h-8 bg-white/20" />
-                    <div className="text-center">
-                      <p className="font-display font-bold">10K+</p>
-                      <p className="text-xs text-white/60">Partners</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Bottom scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-0 animate-fade-in" style={{ animationDelay: '1s' }}>
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <span className="text-xs uppercase tracking-widest">Scroll</span>
-          <div className="w-px h-12 bg-gradient-to-b from-muted-foreground to-transparent" />
         </div>
       </div>
     </section>
