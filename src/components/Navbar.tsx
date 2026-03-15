@@ -74,9 +74,9 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <>
-              <span className="text-sm text-muted-foreground">
-                {user.phone}
-              </span>
+              <Button variant="ghost" size="sm" className="font-medium" asChild>
+                <Link to="/dashboard">Dashboard</Link>
+              </Button>
               <Button variant="ghost" size="sm" className="font-medium" onClick={handleSignOut}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
@@ -132,8 +132,10 @@ const Navbar = () => {
             <div className="flex flex-col gap-3 pt-4 mt-2 border-t border-border/50">
               {user ? (
                 <>
-                  <p className="text-sm text-muted-foreground px-4">{user.phone}</p>
-                  <Button variant="outline" size="lg" className="w-full" onClick={handleSignOut}>
+                  <Button variant="outline" size="lg" className="w-full text-left justify-start" asChild>
+                    <Link to="/dashboard" onClick={() => setIsOpen(false)}>Dashboard</Link>
+                  </Button>
+                  <Button variant="outline" size="lg" className="w-full text-left justify-start" onClick={handleSignOut}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
                   </Button>

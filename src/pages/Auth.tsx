@@ -45,7 +45,7 @@ const Auth: React.FC = () => {
   useEffect(() => {
     // Only auto-redirect if NOT showing the partner selection modal AND not currently processing a login
     if (user && mode !== 'reset' && !showPartnerModal && !isProcessingAuth) {
-      navigate('/dashboard');
+      navigate('/');
     }
   }, [user, navigate, mode, showPartnerModal, isProcessingAuth]);
 
@@ -84,7 +84,7 @@ const Auth: React.FC = () => {
   const handlePartnerChoice = (choice: boolean) => {
     setIsPartner(choice);
     setShowPartnerModal(false);
-    navigate('/dashboard');
+    navigate('/');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,7 +136,7 @@ const Auth: React.FC = () => {
       }
 
       toast.success('Password updated successfully!');
-      navigate('/dashboard');
+      navigate('/');
       return;
     }
 

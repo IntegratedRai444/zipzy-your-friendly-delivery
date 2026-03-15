@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CTASection = () => {
+  const { user, isPartner } = useAuth();
   return (
     <section className="py-32 relative overflow-hidden">
       <div className="container">
@@ -40,17 +42,35 @@ const CTASection = () => {
             </p>
 
             <div className="flex flex-wrap justify-center gap-4 mb-16">
-              <Button variant="hero" size="xl" className="group" asChild>
-                <Link to="/auth">
-                  Request Something
-                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
-              <Button variant="heroOutline" size="xl" asChild>
-                <Link to="/auth">
-                  Become a Partner
-                </Link>
-              </Button>
+              {user ? (
+                <>
+                  <Button variant="hero" size="xl" className="group" asChild>
+                    <Link to="/dashboard">
+                      My Requests
+                      <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                    </Link>
+                  </Button>
+                  <Button variant="heroOutline" size="xl" asChild>
+                    <Link to="/partner">
+                      {isPartner ? "Partner Dashboard" : "Become a Partner"}
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="hero" size="xl" className="group" asChild>
+                    <Link to="/auth">
+                      Request Something
+                      <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                    </Link>
+                  </Button>
+                  <Button variant="heroOutline" size="xl" asChild>
+                    <Link to="/auth">
+                      Become a Partner
+                    </Link>
+                  </Button>
+                </>
+              )}
             </div>
 
             {/* Trust indicators */}

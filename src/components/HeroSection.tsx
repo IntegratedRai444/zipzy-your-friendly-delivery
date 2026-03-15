@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { ShoppingBag, ArrowRight, Play, Star } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import heroIllustration from "@/assets/hero-illustration.png";
 
 const HeroSection = () => {
+  const { user } = useAuth();
   return (
     <section className="relative min-h-screen gradient-hero overflow-hidden noise-overlay">
       {/* Abstract background shapes */}
@@ -59,18 +61,26 @@ const HeroSection = () => {
               Save time, support locals, earn while you travel.
             </p>
 
-            {/* CTA Buttons */}
             <div 
               className="flex flex-wrap gap-4 opacity-0 animate-fade-in stagger-4"
             >
-              <Button variant="hero" size="xl" className="group" asChild>
-                <Link to="/auth">
-                  <ShoppingBag className="w-5 h-5" />
-                  Request Something
-                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
-
+              {user ? (
+                <Button variant="hero" size="xl" className="group" asChild>
+                  <Link to="/dashboard">
+                    <ShoppingBag className="w-5 h-5" />
+                    Go to Dashboard
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="hero" size="xl" className="group" asChild>
+                  <Link to="/auth">
+                    <ShoppingBag className="w-5 h-5" />
+                    Request Something
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              )}
             </div>
 
             {/* Social proof */}

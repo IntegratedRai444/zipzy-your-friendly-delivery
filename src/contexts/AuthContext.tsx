@@ -31,7 +31,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPartner, setIsPartner] = useState(false);
+  const [isPartner, setIsPartner] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('isPartner') === 'true';
+    }
+    return false;
+  });
+
+  const handleSetIsPartner = (value: boolean) => {
+    setIsPartner(value);
+    localStorage.setItem('isPartner', value.toString());
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -123,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       session, 
       loading, 
       isPartner,
-      setIsPartner,
+      setIsPartner: handleSetIsPartner,
       signUp, 
       signIn, 
       signInWithGoogle, 
