@@ -176,7 +176,7 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
       <OTPVerificationDialog
         open={otpDialogOpen}
         onOpenChange={setOtpDialogOpen}
-        deliveryRequestId={delivery.request_id || ''}
+        deliveryId={delivery.id}
         type={pendingStatus === 'picked_up' ? 'pickup' : 'drop'}
         onVerified={() => {
           if (pendingStatus) {

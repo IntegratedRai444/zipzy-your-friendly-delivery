@@ -35,7 +35,7 @@ const trustFeatures = [
 
 const TrustSection = () => {
   return (
-    <section id="trust" className="py-32 bg-foreground text-background relative overflow-hidden">
+    <section id="trust" className="py-16 bg-foreground text-background relative overflow-hidden">
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-background/[0.02] rounded-full blur-3xl" />
@@ -53,7 +53,7 @@ const TrustSection = () => {
 
       <div className="container relative z-10">
         {/* Section header */}
-        <div className="text-center max-w-2xl mx-auto mb-20">
+        <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-background/20 mb-6">
             <Shield className="w-4 h-4" />
             <span className="text-sm font-medium">Built on Trust</span>

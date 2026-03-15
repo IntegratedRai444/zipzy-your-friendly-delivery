@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, MapPin, History, Shield, LogOut, ArrowLeft, Star, Wallet } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type DeliveryRequest = Database['public']['Tables']['requests']['Row'];
 
 const CarrierMode: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -80,7 +80,6 @@ const CarrierMode: React.FC = () => {
           isOnline={isOnline}
           onToggle={toggleOnline}
           updating={updating}
-          destinationCity={availability?.destination_city}
         />
 
         {/* Active Deliveries */}
@@ -172,7 +171,7 @@ const CarrierMode: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 {completedDeliveries.map((delivery) => {
-                  const canRate = delivery.status === 'delivered' && !delivery.carrier_rated && delivery.user_id;
+                  const canRate = delivery.status === 'delivered' && !delivery.partner_rated && delivery.requests?.buyer_id;
                   return (
                     <div 
                       key={delivery.id}
@@ -180,9 +179,9 @@ const CarrierMode: React.FC = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{delivery.item_description}</p>
+                          <p className="font-medium">{delivery.requests?.item_description}</p>
                           <p className="text-sm text-muted-foreground">
-                            {delivery.pickup_city} → {delivery.drop_city}
+                            {delivery.requests?.pickup_city} → {delivery.requests?.drop_city}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -190,14 +189,14 @@ const CarrierMode: React.FC = () => {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => setRatingDelivery(delivery)}
+                              onClick={() => setRatingDelivery(delivery.requests)}
                             >
                               <Star className="w-4 h-4 mr-1.5" />
                               Rate
                             </Button>
                           )}
                           <div className="text-right">
-                            <p className="font-semibold">₹{delivery.estimated_fare}</p>
+                            <p className="font-semibold">₹{delivery.requests?.reward || 0}</p>
                             <p className={`text-xs ${
                               delivery.status === 'delivered' 
                                 ? 'text-green-600' 
@@ -226,7 +225,7 @@ const CarrierMode: React.FC = () => {
           open={!!ratingDelivery}
           onOpenChange={(open) => !open && setRatingDelivery(null)}
           deliveryRequestId={ratingDelivery.id}
-          ratedUserId={ratingDelivery.user_id}
+          ratedUserId={ratingDelivery.buyer_id}
           raterRole="carrier"
           otherPartyName="Sender"
           onRated={refetch}

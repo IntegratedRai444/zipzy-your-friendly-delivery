@@ -32,12 +32,12 @@ export const AdminOverview = () => {
           { data: recent }
         ] = await Promise.all([
           supabase.from('profiles').select('*', { count: 'exact', head: true }),
-          supabase.from('delivery_requests').select('*', { count: 'exact', head: true }),
-          supabase.from('delivery_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('delivery_requests').select('*', { count: 'exact', head: true }).eq('status', 'delivered'),
+          supabase.from('requests').select('*', { count: 'exact', head: true }),
+          supabase.from('requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'delivered'),
           supabase.from('user_verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
           supabase.from('transactions').select('amount').eq('type', 'platform_fee').eq('status', 'completed'),
-          supabase.from('delivery_requests').select('*').order('created_at', { ascending: false }).limit(5)
+          supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(5)
         ]);
 
         const revenue = transactions?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
@@ -120,7 +120,7 @@ export const AdminOverview = () => {
               {recentDeliveries.map((delivery) => (
                 <div key={delivery.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div>
-                    <p className="font-medium text-sm">{delivery.item_description}</p>
+                    <p className="font-medium text-sm">{delivery.item_name || delivery.item_description}</p>
                     <p className="text-xs text-muted-foreground">
                       {delivery.pickup_city} → {delivery.drop_city}
                     </p>

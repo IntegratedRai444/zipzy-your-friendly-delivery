@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/services/api';
 import type { Database } from '@/integrations/supabase/types';
 
 type DeliveryRequest = Database['public']['Tables']['requests']['Row'];
@@ -13,20 +14,16 @@ export const useNearbyRequests = () => {
   const fetchRequests = useCallback(async () => {
     if (!user) return;
 
-    // Fetch pending requests from the actual 'requests' table
-    const { data, error } = await supabase
-      .from('requests')
-      .select('*')
-      .eq('status', 'pending')
-      .neq('buyer_id', user.id) // Don't show own requests
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching requests:', error);
-    } else {
-      setRequests(data || []);
+    try {
+      const response = await api.get('/requests/available');
+      if (response.success) {
+        setRequests(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching nearby requests:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => {

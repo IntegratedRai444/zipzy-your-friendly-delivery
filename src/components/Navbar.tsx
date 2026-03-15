@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from "./ui/avatar";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, isPartner, signOut } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,8 +21,13 @@ const Navbar = () => {
   }, []);
 
   const handleSignOut = async () => {
+    setIsOpen(false);
     await signOut();
     navigate('/');
+    // Force a minor delay and reload if we're somehow still stuck (optional but safe)
+    if (window.location.pathname === '/' || window.location.pathname === '/auth') {
+      window.location.reload();
+    }
   };
 
   const navLinks = [
@@ -66,9 +71,15 @@ const Navbar = () => {
             <div className="flex items-center gap-2">
               <NotificationBell />
 
+
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/wallet">Wallet</Link>
               </Button>
+              {isPartner && (
+                <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary hover:bg-primary/10">
+                  <Link to="/partner">Partner Mode</Link>
+                </Button>
+              )}
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/settings">Settings</Link>
               </Button>
@@ -129,9 +140,15 @@ const Navbar = () => {
                     <NotificationBell />
                   </div>
 
+
                   <Button variant="ghost" size="lg" className="w-full text-left justify-start" asChild>
                     <Link to="/wallet" onClick={() => setIsOpen(false)}>Wallet</Link>
                   </Button>
+                  {isPartner && (
+                    <Button variant="ghost" size="lg" className="w-full text-left justify-start text-primary" asChild>
+                      <Link to="/partner" onClick={() => setIsOpen(false)}>Partner Mode</Link>
+                    </Button>
+                  )}
                   <Button variant="ghost" size="lg" className="w-full text-left justify-start" asChild>
                     <Link to="/settings" onClick={() => setIsOpen(false)}>Settings</Link>
                   </Button>

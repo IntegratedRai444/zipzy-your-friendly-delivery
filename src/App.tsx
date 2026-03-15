@@ -22,6 +22,10 @@ import { AdminVerifications } from "./pages/admin/AdminVerifications";
 import { AdminTransactions } from "./pages/admin/AdminTransactions";
 import { AdminActions } from "./pages/admin/AdminActions";
 import { AdminPromos } from "./pages/admin/AdminPromos";
+import PartnerOnboarding from "./pages/PartnerOnboarding";
+import PartnerMode from "./pages/PartnerMode";
+import PartnerEarnings from "./pages/PartnerEarnings";
+import PartnerTrips from "./pages/PartnerTrips";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +82,26 @@ const App = () => (
             <Route path="/chat/:id" element={
               <ProtectedRoute>
                 <Requests />
+              </ProtectedRoute>
+            } />
+            <Route path="/partner-onboarding" element={
+              <ProtectedRoute>
+                <PartnerOnboarding />
+              </ProtectedRoute>
+            } />
+            <Route path="/partner" element={
+              <ProtectedRoute>
+                <PartnerMode />
+              </ProtectedRoute>
+            } />
+            <Route path="/partner/earnings" element={
+              <ProtectedRoute>
+                <PartnerEarnings />
+              </ProtectedRoute>
+            } />
+            <Route path="/partner/trips" element={
+              <ProtectedRoute>
+                <PartnerTrips />
               </ProtectedRoute>
             } />
             {/* Admin Routes */}

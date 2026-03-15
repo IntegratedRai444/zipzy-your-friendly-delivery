@@ -23,13 +23,13 @@ const steps = [
 
 const HowItWorksSection = () => {
   return (
-    <section id="how-it-works" className="py-32 bg-muted/30 relative overflow-hidden">
+    <section id="how-it-works" className="py-16 bg-muted/30 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
       
       <div className="container">
         {/* Section header */}
-        <div className="text-center max-w-2xl mx-auto mb-20">
+        <div className="text-center max-w-2xl mx-auto mb-10">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-4">
             How It Works
           </p>
@@ -80,7 +80,7 @@ const HowItWorksSection = () => {
         </div>
 
         {/* Bottom stat */}
-        <div className="mt-20 text-center">
+        <div className="mt-12 text-center">
           <div className="inline-flex items-center gap-4 px-8 py-4 rounded-full border border-border bg-card">
             <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
             <span className="font-medium">Flexible requests get fulfilled <span className="font-bold">faster</span></span>

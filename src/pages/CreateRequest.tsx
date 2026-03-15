@@ -2,6 +2,7 @@ import React, { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -119,8 +120,7 @@ const CreateRequest: React.FC = () => {
         ? validated.buy_from_shop 
         : '';
 
-      const { error } = await supabase.from('requests').insert([{
-        buyer_id: user?.id as string,
+      await api.post('/requests', {
         item_name: validated.item_description,
         item_description: fullDescription,
         item_size: 'small', // Default for purchase requests
@@ -136,10 +136,7 @@ const CreateRequest: React.FC = () => {
         reward: partnerReward,
         item_value: validated.max_budget || 0,
         platform_fee: platformFee,
-        status: 'pending',
-      }]);
-      
-      if (error) throw error;
+      });
       
       toast.success("Request created successfully!");
       navigate('/dashboard');

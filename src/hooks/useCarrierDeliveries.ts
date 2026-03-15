@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { notifyDeliveryStatusChange } from '@/hooks/useTriggerPushNotification';
+import { api } from '@/services/api';
 import type { Database } from '@/integrations/supabase/types';
 
 type Delivery = Database['public']['Tables']['deliveries']['Row'] & {
@@ -65,43 +66,7 @@ export const useCarrierDeliveries = () => {
     if (!user) return false;
 
     try {
-      // Get the request first to get buyer info
-      const { data: request } = await supabase
-        .from('requests')
-        .select('buyer_id, item_description')
-        .eq('id', requestId)
-        .single();
-
-      if (!request) throw new Error('Request not found');
-
-      // Create a new delivery record
-      const { error: deliveryError } = await supabase
-        .from('deliveries')
-        .insert({
-          request_id: requestId,
-          partner_id: user.id,
-          status: 'matched',
-          accepted_at: new Date().toISOString(),
-        });
-
-      if (deliveryError) throw deliveryError;
-
-      // Update the request status
-      const { error: requestError } = await supabase
-        .from('requests')
-        .update({ status: 'matched' })
-        .eq('id', requestId)
-        .eq('status', 'pending');
-
-      if (requestError) throw requestError;
-
-      // Send push notification to buyer
-      notifyDeliveryStatusChange(
-        request.buyer_id || '',
-        'matched',
-        request.item_description || '',
-        requestId
-      );
+      await api.post('/deliveries/accept', { request_id: requestId });
 
       toast({
         title: 'Request accepted!',
@@ -128,38 +93,7 @@ export const useCarrierDeliveries = () => {
       const delivery = deliveries.find(d => d.request_id === requestId);
       if (!delivery) throw new Error('Delivery not found');
 
-      const updateData: any = { status };
-      
-      if (status === 'picked_up') {
-        updateData.picked_up_at = new Date().toISOString();
-      } else if (status === 'delivered') {
-        updateData.delivered_at = new Date().toISOString();
-      }
-
-      const { error: deliveryError } = await supabase
-        .from('deliveries')
-        .update(updateData)
-        .eq('id', delivery.id);
-
-      if (deliveryError) throw deliveryError;
-
-      // Also update the request status for historical tracking
-      const { error: requestError } = await supabase
-        .from('requests')
-        .update({ status })
-        .eq('id', requestId);
-
-      if (requestError) throw requestError;
-
-      // Send push notification to buyer
-      if (delivery.requests) {
-        notifyDeliveryStatusChange(
-          delivery.requests.buyer_id || '',
-          status as any,
-          delivery.requests.item_description || '',
-          requestId
-        );
-      }
+      await api.patch(`/deliveries/${delivery.id}/status`, { status });
 
       toast({
         title: 'Status updated',

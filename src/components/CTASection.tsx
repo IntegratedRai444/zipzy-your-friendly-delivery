@@ -6,9 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 const CTASection = () => {
   const { user, isPartner } = useAuth();
   return (
-    <section className="py-32 relative overflow-hidden">
+    <section className="py-20 relative overflow-hidden">
       <div className="container">
-        <div className="relative rounded-[2.5rem] p-12 md:p-20 overflow-hidden">
+        <div className="relative rounded-[2.5rem] p-10 md:p-14 overflow-hidden">
           {/* Background with gradient */}
           <div className="absolute inset-0 bg-muted/50" />
           

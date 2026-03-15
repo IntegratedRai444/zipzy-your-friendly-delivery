@@ -7,7 +7,7 @@ import heroIllustration from "@/assets/hero-illustration.png";
 const HeroSection = () => {
   const { user } = useAuth();
   return (
-    <section className="relative min-h-screen gradient-hero overflow-hidden noise-overlay">
+    <section className="relative min-h-[75vh] gradient-hero overflow-hidden noise-overlay">
       {/* Abstract background shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-foreground/[0.03] to-transparent blur-3xl" />
@@ -24,10 +24,10 @@ const HeroSection = () => {
         }}
       />
 
-      <div className="container relative z-10 pt-32 pb-24">
+      <div className="container relative z-10 pt-16 pb-8">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left content */}
-          <div className="space-y-10">
+          <div className="space-y-6">
             {/* Badge */}
             <div 
               className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full border border-border bg-background/50 backdrop-blur-sm opacity-0 animate-fade-in"
@@ -131,37 +131,9 @@ const HeroSection = () => {
                   <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-background/20 to-transparent" />
                 </div>
                 
-                {/* Floating card - Fast delivery */}
-                <div 
-                  className="absolute -left-12 top-16 glass rounded-2xl p-5 shadow-lg border border-border/50 animate-float-delayed"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-foreground flex items-center justify-center">
-                      <svg className="w-6 h-6 text-background" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-display font-semibold text-lg">Same Day</p>
-                      <p className="text-sm text-muted-foreground">Most requests</p>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Floating card - Savings */}
-                <div 
-                  className="absolute -right-8 bottom-24 glass rounded-2xl p-5 shadow-lg border border-border/50"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-                      <span className="text-background font-display font-bold text-lg">₹</span>
-                    </div>
-                    <div>
-                      <p className="font-display font-semibold text-lg">Earn Extra</p>
-                      <p className="text-sm text-muted-foreground">As a Partner</p>
-                    </div>
-                  </div>
-                </div>
+
+
 
                 {/* Stats pill */}
                 <div 

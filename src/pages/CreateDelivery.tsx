@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -76,25 +77,22 @@ const CreateDelivery: React.FC = () => {
       const validated = deliverySchema.parse(formData);
       
       setLoading(true);
-      const { error } = await supabase.from('delivery_requests').insert([{
-        user_id: user?.id as string,
+      await api.post('/requests', {
+        item_name: validated.item_description.split(' ').slice(0, 5).join(' '),
         item_description: validated.item_description,
         item_size: validated.item_size,
         pickup_address: validated.pickup_address,
         pickup_city: validated.pickup_city,
-        pickup_postal_code: validated.pickup_postal_code || null,
-        pickup_phone: validated.pickup_phone,
-        pickup_instructions: validated.pickup_instructions || null,
+        pickup_notes: validated.pickup_instructions || null,
         drop_address: validated.drop_address,
         drop_city: validated.drop_city,
-        drop_postal_code: validated.drop_postal_code || null,
         drop_phone: validated.drop_phone,
         drop_instructions: validated.drop_instructions || null,
         urgency: validated.urgency,
-        estimated_fare: calculateFare(),
-      }]);
-      
-      if (error) throw error;
+        reward: calculateFare(),
+        item_value: 0,
+        platform_fee: 0,
+      });
       
       toast.success('Delivery request created successfully!');
       navigate('/dashboard');

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/services/api';
 import type { Database } from '@/integrations/supabase/types';
 
 type Wallet = Database['public']['Tables']['wallets']['Row'];
@@ -12,65 +13,46 @@ export const useWallet = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchWallet = useCallback(async () => {
+  const fetchWalletData = useCallback(async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error) {
-      console.error('Error fetching wallet:', error);
-      // Try to create wallet if it doesn't exist
-      if (error.code === 'PGRST116') {
-        const { data: newWallet, error: createError } = await supabase
-          .from('wallets')
-          .insert({ user_id: user.id })
-          .select()
-          .single();
-        
-        if (!createError && newWallet) {
-          setWallet(newWallet);
-        }
+    try {
+      const response = await api.get('/wallet/summary');
+      if (response.success) {
+        setWallet(response.data.wallet);
+        setTransactions(response.data.transactions || []);
       }
-    } else {
-      setWallet(data);
+    } catch (error) {
+      console.error('Error fetching wallet data:', error);
     }
   }, [user]);
 
-  const fetchTransactions = useCallback(async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error('Error fetching transactions:', error);
-    } else {
-      setTransactions(data || []);
+  const creditWallet = async (amount: number) => {
+    try {
+      await api.post('/wallet/add', { amount });
+      await fetchWalletData();
+      return true;
+    } catch (error) {
+      console.error('Error crediting wallet:', error);
+      return false;
     }
-  }, [user]);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      await Promise.all([fetchWallet(), fetchTransactions()]);
+      await fetchWalletData();
       setLoading(false);
     };
 
     fetchData();
-  }, [fetchWallet, fetchTransactions]);
+  }, [fetchWalletData]);
 
   return {
     wallet,
     transactions,
     loading,
-    refetch: () => Promise.all([fetchWallet(), fetchTransactions()]),
+    creditWallet,
+    refetch: fetchWalletData,
   };
 };

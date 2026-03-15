@@ -4,7 +4,7 @@ import { Package, MapPin, Clock, IndianRupee, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type DeliveryRequest = Database['public']['Tables']['requests']['Row'];
 
 const urgencyLabels: Record<string, { label: string; color: string }> = {
   standard: { label: 'Standard', color: 'bg-muted text-muted-foreground' },
@@ -40,7 +40,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             <Package className="w-5 h-5 text-muted-foreground" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold truncate">{request.item_description}</h3>
+            <h3 className="font-semibold truncate">{request.item_name || request.item_description}</h3>
             <div className="flex items-center gap-2 mt-1">
               <span className={`text-xs px-2 py-0.5 rounded-full ${urgency.color}`}>
                 {urgency.label}
@@ -55,9 +55,9 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <div className="text-right shrink-0">
           <div className="flex items-center gap-1 font-semibold text-lg">
             <IndianRupee className="w-4 h-4" />
-            {request.estimated_fare}
+            {request.reward}
           </div>
-          <p className="text-xs text-muted-foreground">Est. fare</p>
+          <p className="text-xs text-muted-foreground">Reward</p>
         </div>
       </div>
 

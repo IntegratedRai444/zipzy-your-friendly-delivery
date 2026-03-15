@@ -58,11 +58,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsPartner(value);
     localStorage.setItem('isPartner', value.toString());
 
-    if (user && value) {
-      // Upsert partner role in DB
+    if (user) {
+      const role = value ? 'partner' : 'buyer';
+      // Upsert role in DB
       const { error } = await supabase
         .from('user_roles')
-        .upsert({ user_id: user.id, role: 'partner' }, { onConflict: 'user_id,role' });
+        .upsert({ user_id: user.id, role: role }, { onConflict: 'user_id,role' });
       
       if (error) {
         console.error('Error updating user role:', error);
@@ -71,34 +72,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    const initAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+        
+        if (initialSession?.user) {
+          // Fetch role in background, don't block initial loading
+          fetchUserRole(initialSession.user.id);
+        }
+      } catch (err) {
+        console.error('Error during initial auth check:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchUserRole(session.user.id);
+          fetchUserRole(session.user.id);
         } else {
           setIsPartner(false);
           localStorage.removeItem('isPartner');
         }
         
+        // Initial loading might already be false from initAuth, but ensure it stays consistent
         setLoading(false);
       }
     );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchUserRole(session.user.id);
-      }
-      
-      setLoading(false);
-    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -125,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-    const redirectUrl = `${window.location.origin}/dashboard`;
+    const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -164,7 +172,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Always clear local state to prevent being stuck logged in
+      setSession(null);
+      setUser(null);
+      setIsPartner(false);
+      localStorage.removeItem('isPartner');
+      // If we're on a protected route, this will trigger the ProtectedRoute redirect
+    }
   };
 
   return (

@@ -37,7 +37,7 @@ const features = [
 
 const FeaturesSection = () => {
   return (
-    <section id="features" className="py-32 relative">
+    <section id="features" className="py-16 relative">
       {/* Background pattern */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] rounded-full bg-gradient-to-br from-muted/50 to-transparent blur-3xl" />
@@ -46,7 +46,7 @@ const FeaturesSection = () => {
 
       <div className="container relative z-10">
         {/* Section header */}
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-20">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-12">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-4">
               Why Zipzy Works

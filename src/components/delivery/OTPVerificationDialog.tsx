@@ -9,13 +9,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/services/api';
 import { toast } from 'sonner';
 import { CheckCircle, Key } from 'lucide-react';
 
 interface OTPVerificationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  deliveryRequestId: string;
+  deliveryId: string;
   type: 'pickup' | 'drop';
   onVerified: () => void;
 }
@@ -23,35 +24,20 @@ interface OTPVerificationDialogProps {
 export const OTPVerificationDialog: React.FC<OTPVerificationDialogProps> = ({
   open,
   onOpenChange,
-  deliveryRequestId,
+  deliveryId,
   type,
   onVerified,
 }) => {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [expectedOtp, setExpectedOtp] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
 
   useEffect(() => {
     if (open) {
-      fetchOtp();
       setOtp('');
       setVerified(false);
     }
-  }, [open, deliveryRequestId, type]);
-
-  const fetchOtp = async () => {
-    const { data, error } = await supabase
-      .from('deliveries')
-      .select('pickup_otp, drop_otp')
-      .eq('request_id', deliveryRequestId)
-      .single();
-
-    if (!error && data) {
-      const otpValue = type === 'pickup' ? data.pickup_otp : data.drop_otp;
-      setExpectedOtp(otpValue);
-    }
-  };
+  }, [open, deliveryId, type]);
 
   const handleVerify = async () => {
     if (otp.length !== 4) {
@@ -59,14 +45,10 @@ export const OTPVerificationDialog: React.FC<OTPVerificationDialogProps> = ({
       return;
     }
 
-    if (otp !== expectedOtp) {
-      toast.error('Invalid OTP. Please check and try again.');
-      return;
-    }
-
     setLoading(true);
     try {
-      // OTP verified successfully - this just validates, the status update happens in parent
+      await api.post(`/deliveries/${deliveryId}/otp/verify`, { otp, type });
+      
       setVerified(true);
       toast.success(`${type === 'pickup' ? 'Pickup' : 'Delivery'} verified!`);
       
@@ -74,9 +56,9 @@ export const OTPVerificationDialog: React.FC<OTPVerificationDialogProps> = ({
         onVerified();
         onOpenChange(false);
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Verification failed:', err);
-      toast.error('Verification failed');
+      toast.error(err.message || 'Invalid OTP. Please check and try again.');
     } finally {
       setLoading(false);
     }
