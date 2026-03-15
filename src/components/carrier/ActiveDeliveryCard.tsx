@@ -8,10 +8,13 @@ import { ProofOfPurchaseUpload } from '@/components/delivery/ProofOfPurchaseUplo
 import { useLocationTracking } from '@/hooks/useLocationTracking';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type Delivery = Database['public']['Tables']['deliveries']['Row'] & {
+  requests: Database['public']['Tables']['requests']['Row'] | null;
+};
 type DeliveryStatus = Database['public']['Enums']['delivery_status'];
 
 const statusConfig: Record<string, { label: string; nextAction: string; nextStatus: DeliveryStatus | null; requiresOtp?: boolean }> = {
+  assigned: { label: 'Assigned', nextAction: 'Go to Pickup', nextStatus: 'picked_up', requiresOtp: true },
   matched: { label: 'Go to Pickup', nextAction: 'Verify Pickup', nextStatus: 'picked_up', requiresOtp: true },
   picked_up: { label: 'In Transit', nextAction: 'Start Transit', nextStatus: 'in_transit' },
   in_transit: { label: 'Delivering', nextAction: 'Verify Delivery', nextStatus: 'delivered', requiresOtp: true },
@@ -19,7 +22,7 @@ const statusConfig: Record<string, { label: string; nextAction: string; nextStat
 };
 
 interface ActiveDeliveryCardProps {
-  delivery: DeliveryRequest;
+  delivery: Delivery;
   onUpdateStatus: (id: string, status: DeliveryStatus) => void;
   updating?: boolean;
 }
@@ -56,9 +59,9 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
               <Package className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h3 className="font-semibold">{delivery.item_description}</h3>
+              <h3 className="font-semibold">{delivery.requests?.item_name || delivery.requests?.item_description}</h3>
               <p className="text-sm text-muted-foreground">
-                Order #{delivery.id.slice(0, 8).toUpperCase()}
+                Order #{delivery.request_id?.slice(0, 8).toUpperCase()}
               </p>
             </div>
           </div>
@@ -76,9 +79,8 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-green-600 mb-0.5">PICKUP</p>
-              <p className="text-sm font-medium">{delivery.pickup_address}</p>
-              <p className="text-xs text-muted-foreground">{delivery.pickup_city}</p>
-              {/* Phone hidden for privacy - use in-app chat */}
+              <p className="text-sm font-medium">{delivery.requests?.pickup_address}</p>
+              <p className="text-xs text-muted-foreground">{delivery.requests?.pickup_city}</p>
             </div>
           </div>
 
@@ -88,9 +90,8 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-red-600 mb-0.5">DROP</p>
-              <p className="text-sm font-medium">{delivery.drop_address}</p>
-              <p className="text-xs text-muted-foreground">{delivery.drop_city}</p>
-              {/* Phone hidden for privacy - use in-app chat */}
+              <p className="text-sm font-medium">{delivery.requests?.drop_address}</p>
+              <p className="text-xs text-muted-foreground">{delivery.requests?.drop_city}</p>
             </div>
           </div>
         </div>
@@ -98,7 +99,7 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
         {/* Fare */}
         <div className="flex items-center justify-between p-3 rounded-xl bg-muted mb-4">
           <span className="text-sm text-muted-foreground">Your Earnings</span>
-          <span className="font-semibold text-lg">₹{delivery.estimated_fare}</span>
+          <span className="font-semibold text-lg">₹{delivery.requests?.reward || 0}</span>
         </div>
 
         {/* Actions */}
@@ -122,7 +123,7 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
                   setPendingStatus(config.nextStatus);
                   setOtpDialogOpen(true);
                 } else {
-                  onUpdateStatus(delivery.id, config.nextStatus!);
+                  onUpdateStatus(delivery.request_id || '', config.nextStatus!);
                 }
               }}
               disabled={updating}
@@ -140,25 +141,25 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
         {delivery.status === 'picked_up' && (
           <div className="mt-4 pt-4 border-t border-border">
             <ProofOfPurchaseUpload
-              deliveryRequestId={delivery.id}
-              existingProofUrl={delivery.purchase_proof_url}
+              deliveryRequestId={delivery.request_id || ''}
+              existingProofUrl={delivery.purchase_proof_url || undefined}
             />
           </div>
         )}
 
         {/* Instructions */}
-        {(delivery.pickup_instructions || delivery.drop_instructions) && (
+        {(delivery.requests?.pickup_notes || delivery.requests?.drop_notes) && (
           <div className="mt-4 pt-4 border-t border-border">
-            {delivery.pickup_instructions && delivery.status === 'matched' && (
+            {delivery.requests?.pickup_notes && delivery.status === 'matched' && (
               <div className="text-sm">
                 <span className="font-medium">Pickup Note:</span>
-                <span className="text-muted-foreground ml-1">{delivery.pickup_instructions}</span>
+                <span className="text-muted-foreground ml-1">{delivery.requests?.pickup_notes}</span>
               </div>
             )}
-            {delivery.drop_instructions && delivery.status === 'in_transit' && (
+            {delivery.requests?.drop_notes && delivery.status === 'in_transit' && (
               <div className="text-sm">
                 <span className="font-medium">Drop Note:</span>
-                <span className="text-muted-foreground ml-1">{delivery.drop_instructions}</span>
+                <span className="text-muted-foreground ml-1">{delivery.requests?.drop_notes}</span>
               </div>
             )}
           </div>
@@ -168,18 +169,18 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
       <ChatSheet
         open={chatOpen}
         onOpenChange={setChatOpen}
-        deliveryRequestId={delivery.id}
+        deliveryRequestId={delivery.request_id}
         otherPartyName="Sender"
       />
 
       <OTPVerificationDialog
         open={otpDialogOpen}
         onOpenChange={setOtpDialogOpen}
-        deliveryRequestId={delivery.id}
+        deliveryRequestId={delivery.request_id || ''}
         type={pendingStatus === 'picked_up' ? 'pickup' : 'drop'}
         onVerified={() => {
           if (pendingStatus) {
-            onUpdateStatus(delivery.id, pendingStatus);
+            onUpdateStatus(delivery.request_id || '', pendingStatus);
             setPendingStatus(null);
           }
         }}

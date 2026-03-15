@@ -101,6 +101,63 @@ export type Database = {
         }
         Relationships: []
       }
+      deliveries: {
+        Row: {
+          accepted_at: string | null
+          buyer_rated: boolean | null
+          delivered_at: string | null
+          delivery_deadline: string | null
+          drop_otp: string | null
+          escrow_id: string | null
+          id: string
+          partner_id: string | null
+          partner_rated: boolean | null
+          picked_up_at: string | null
+          pickup_deadline: string | null
+          pickup_otp: string | null
+          purchase_proof_uploaded_at: string | null
+          purchase_proof_url: string | null
+          request_id: string | null
+          status: Database["public"]["Enums"]["delivery_status"] | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          buyer_rated?: boolean | null
+          delivered_at?: string | null
+          delivery_deadline?: string | null
+          drop_otp?: string | null
+          escrow_id?: string | null
+          id?: string
+          partner_id?: string | null
+          partner_rated?: boolean | null
+          picked_up_at?: string | null
+          pickup_deadline?: string | null
+          pickup_otp?: string | null
+          purchase_proof_uploaded_at?: string | null
+          purchase_proof_url?: string | null
+          request_id?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+        }
+        Update: {
+          accepted_at?: string | null
+          buyer_rated?: boolean | null
+          delivered_at?: string | null
+          delivery_deadline?: string | null
+          drop_otp?: string | null
+          escrow_id?: string | null
+          id?: string
+          partner_id?: string | null
+          partner_rated?: boolean | null
+          picked_up_at?: string | null
+          pickup_deadline?: string | null
+          pickup_otp?: string | null
+          purchase_proof_uploaded_at?: string | null
+          purchase_proof_url?: string | null
+          request_id?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+        }
+        Relationships: []
+      }
       delivery_requests: {
         Row: {
           cancellation_reason: string | null
@@ -221,6 +278,105 @@ export type Database = {
           updated_at?: string
           urgency?: Database["public"]["Enums"]["urgency_level"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      requests: {
+        Row: {
+          buyer_id: string | null
+          cancelled_by: string | null
+          cancellation_reason: string | null
+          created_at: string
+          drop_address: string | null
+          drop_city: string | null
+          drop_location: unknown | null
+          drop_notes: string | null
+          drop_postal_code: string | null
+          estimated_price: number | null
+          expires_at: string | null
+          id: string
+          is_phone_visible: boolean | null
+          item_description: string | null
+          item_name: string
+          item_size: Database["public"]["Enums"]["item_size"] | null
+          item_value: number | null
+          pickup_address: string | null
+          pickup_city: string | null
+          pickup_location: unknown | null
+          pickup_notes: string | null
+          pickup_postal_code: string | null
+          platform_fee: number | null
+          preferred_date: string | null
+          reward: number | null
+          status: Database["public"]["Enums"]["delivery_status"] | null
+          total_price: number | null
+          updated_at: string
+          urgency: Database["public"]["Enums"]["urgency_level"] | null
+          weight: number | null
+        }
+        Insert: {
+          buyer_id?: string | null
+          cancelled_by?: string | null
+          cancellation_reason?: string | null
+          created_at?: string
+          drop_address?: string | null
+          drop_city?: string | null
+          drop_location?: unknown | null
+          drop_notes?: string | null
+          drop_postal_code?: string | null
+          estimated_price?: number | null
+          expires_at?: string | null
+          id?: string
+          is_phone_visible?: boolean | null
+          item_description?: string | null
+          item_name: string
+          item_size?: Database["public"]["Enums"]["item_size"] | null
+          item_value?: number | null
+          pickup_address?: string | null
+          pickup_city?: string | null
+          pickup_location?: unknown | null
+          pickup_notes?: string | null
+          pickup_postal_code?: string | null
+          platform_fee?: number | null
+          preferred_date?: string | null
+          reward?: number | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+          total_price?: number | null
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["urgency_level"] | null
+          weight?: number | null
+        }
+        Update: {
+          buyer_id?: string | null
+          cancelled_by?: string | null
+          cancellation_reason?: string | null
+          created_at?: string
+          drop_address?: string | null
+          drop_city?: string | null
+          drop_location?: unknown | null
+          drop_notes?: string | null
+          drop_postal_code?: string | null
+          estimated_price?: number | null
+          expires_at?: string | null
+          id?: string
+          is_phone_visible?: boolean | null
+          item_description?: string | null
+          item_name?: string
+          item_size?: Database["public"]["Enums"]["item_size"] | null
+          item_value?: number | null
+          pickup_address?: string | null
+          pickup_city?: string | null
+          pickup_location?: unknown | null
+          pickup_notes?: string | null
+          pickup_postal_code?: string | null
+          platform_fee?: number | null
+          preferred_date?: string | null
+          reward?: number | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+          total_price?: number | null
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["urgency_level"] | null
+          weight?: number | null
         }
         Relationships: []
       }
@@ -411,6 +567,8 @@ export type Database = {
           id: string
           latitude: number
           longitude: number
+          is_online: boolean | null
+          max_detour_km: number | null
           partner_id: string
           speed: number | null
           updated_at: string
@@ -423,6 +581,8 @@ export type Database = {
           id?: string
           latitude: number
           longitude: number
+          is_online?: boolean | null
+          max_detour_km?: number | null
           partner_id: string
           speed?: number | null
           updated_at?: string
@@ -435,6 +595,8 @@ export type Database = {
           id?: string
           latitude?: number
           longitude?: number
+          is_online?: boolean | null
+          max_detour_km?: number | null
           partner_id?: string
           speed?: number | null
           updated_at?: string
@@ -1001,6 +1163,54 @@ export type Database = {
         }
         Relationships: []
       }
+      users: {
+        Row: {
+          address: string | null
+          avatar_url: string | null
+          city: string | null
+          created_at: string
+          delivery_instructions: string | null
+          email: string
+          id: string
+          is_verified: boolean | null
+          name: string | null
+          phone: string | null
+          postal_code: string | null
+          updated_at: string
+          verification_status: string | null
+        }
+        Insert: {
+          address?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string
+          delivery_instructions?: string | null
+          email: string
+          id: string
+          is_verified?: boolean | null
+          name?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          verification_status?: string | null
+        }
+        Update: {
+          address?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string
+          delivery_instructions?: string | null
+          email?: string
+          id?: string
+          is_verified?: boolean | null
+          name?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          verification_status?: string | null
+        }
+        Relationships: []
+      }
       user_verifications: {
         Row: {
           created_at: string
@@ -1081,7 +1291,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "partner" | "buyer"
       delivery_status:
         | "pending"
         | "matched"
@@ -1250,7 +1460,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "partner", "buyer"],
       delivery_status: [
         "pending",
         "matched",

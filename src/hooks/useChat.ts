@@ -6,7 +6,7 @@ import type { Database } from '@/integrations/supabase/types';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 
-export const useChat = (deliveryRequestId: string | null) => {
+export const useChat = (deliveryId: string | null) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,34 +25,34 @@ export const useChat = (deliveryRequestId: string | null) => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('delivery_request_id', deliveryRequestId)
+        .eq('delivery_id', deliveryId)
         .order('created_at', { ascending: true });
 
       if (!error && data) {
-        setMessages(data);
+        setMessages(data as any[]);
       }
       setLoading(false);
     };
 
     fetchMessages();
-  }, [deliveryRequestId]);
+  }, [deliveryId]);
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!deliveryRequestId) return;
+    if (!deliveryId) return;
 
     const channel = supabase
-      .channel(`messages-${deliveryRequestId}`)
+      .channel(`messages-${deliveryId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `delivery_request_id=eq.${deliveryRequestId}`,
+          filter: `delivery_id=eq.${deliveryId}`,
         },
         (payload) => {
-          const newMessage = payload.new as Message;
+          const newMessage = payload.new as any;
           setMessages((prev) => {
             // Avoid duplicates
             if (prev.some((m) => m.id === newMessage.id)) return prev;
@@ -65,56 +65,65 @@ export const useChat = (deliveryRequestId: string | null) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [deliveryRequestId]);
+  }, [deliveryId]);
 
   // Mark messages as read
   useEffect(() => {
-    if (!deliveryRequestId || !user) return;
+    if (!deliveryId || !user) return;
 
     const markAsRead = async () => {
       await supabase
         .from('messages')
-        .update({ is_read: true })
-        .eq('delivery_request_id', deliveryRequestId)
+        .update({ is_read: true } as any)
+        .eq('delivery_id', deliveryId)
         .neq('sender_id', user.id)
         .eq('is_read', false);
     };
 
     markAsRead();
-  }, [deliveryRequestId, user, messages]);
+  }, [deliveryId, user, messages]);
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!deliveryRequestId || !user || !content.trim()) return;
+      if (!deliveryId || !user || !content.trim()) return;
 
       setSending(true);
       const { error } = await supabase.from('messages').insert({
-        delivery_request_id: deliveryRequestId,
+        delivery_id: deliveryId,
         sender_id: user.id,
-        content: content.trim(),
-      });
+        message_text: content.trim(),
+      } as any);
 
       // Send push notification to the other party
       if (!error) {
         // Get the delivery to find the other party
         const { data: delivery } = await supabase
-          .from('delivery_requests')
-          .select('user_id, partner_id')
-          .eq('id', deliveryRequestId)
+          .from('deliveries')
+          .select('partner_id, request_id')
+          .eq('id', deliveryId)
           .single();
 
         if (delivery) {
-          const recipientId = delivery.user_id === user.id 
-            ? delivery.partner_id 
-            : delivery.user_id;
+          // Need to get buyer_id from requests table
+          const { data: request } = await supabase
+            .from('requests')
+            .select('buyer_id')
+            .eq('id', delivery.request_id)
+            .single();
 
-          if (recipientId) {
-            notifyNewMessage(
-              recipientId,
-              'Your delivery contact',
-              content.trim(),
-              deliveryRequestId
-            );
+          if (request) {
+            const recipientId = request.buyer_id === user.id 
+              ? delivery.partner_id 
+              : request.buyer_id;
+
+            if (recipientId) {
+              notifyNewMessage(
+                recipientId,
+                'Your delivery contact',
+                content.trim(),
+                deliveryId
+              );
+            }
           }
         }
       }

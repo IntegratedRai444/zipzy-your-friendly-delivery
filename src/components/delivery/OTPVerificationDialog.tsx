@@ -42,9 +42,9 @@ export const OTPVerificationDialog: React.FC<OTPVerificationDialogProps> = ({
 
   const fetchOtp = async () => {
     const { data, error } = await supabase
-      .from('delivery_requests')
+      .from('deliveries')
       .select('pickup_otp, drop_otp')
-      .eq('id', deliveryRequestId)
+      .eq('request_id', deliveryRequestId)
       .single();
 
     if (!error && data) {

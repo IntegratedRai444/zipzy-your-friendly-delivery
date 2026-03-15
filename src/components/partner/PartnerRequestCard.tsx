@@ -4,7 +4,7 @@ import { ShoppingBag, MapPin, Clock, IndianRupee, ArrowRight, Info } from 'lucid
 import { format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type RequestRow = Database['public']['Tables']['requests']['Row'];
 
 const urgencyLabels: Record<string, { label: string; color: string }> = {
   standard: { label: 'Flexible', color: 'bg-muted text-muted-foreground' },
@@ -13,7 +13,7 @@ const urgencyLabels: Record<string, { label: string; color: string }> = {
 };
 
 interface PartnerRequestCardProps {
-  request: DeliveryRequest;
+  request: RequestRow;
   onAccept: (id: string) => void;
   accepting?: boolean;
 }
@@ -23,22 +23,22 @@ export const PartnerRequestCard: React.FC<PartnerRequestCardProps> = ({
   onAccept,
   accepting,
 }) => {
-  const urgency = urgencyLabels[request.urgency] || urgencyLabels.standard;
+  const urgency = urgencyLabels[request.urgency || 'standard'] || urgencyLabels.standard;
   
-  // Parse budget from pickup_instructions if available
-  const budgetMatch = request.pickup_instructions?.match(/Max budget: ₹(\d+)/);
+  // Parse budget from pickup_notes if available
+  const budgetMatch = request.pickup_notes?.match(/Max budget: ₹(\d+)/);
   const maxBudget = budgetMatch ? parseInt(budgetMatch[1]) : null;
 
   return (
     <div className="bg-background rounded-2xl border border-border p-5 hover:shadow-md transition-shadow">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-4">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-foreground/5 flex items-center justify-center shrink-0">
             <ShoppingBag className="w-6 h-6" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-lg">{request.item_description}</h3>
+            <h3 className="font-semibold text-lg">{request.item_name || request.item_description}</h3>
             <div className="flex flex-wrap items-center gap-2 mt-1">
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${urgency.color}`}>
                 {urgency.label}
@@ -57,7 +57,7 @@ export const PartnerRequestCard: React.FC<PartnerRequestCardProps> = ({
           <div className="flex items-center gap-1 font-bold text-xl text-green-600">
             <span>+</span>
             <IndianRupee className="w-4 h-4" />
-            {request.estimated_fare}
+            {request.reward || 0}
           </div>
           <p className="text-xs text-muted-foreground">You'll earn</p>
         </div>
@@ -108,7 +108,7 @@ export const PartnerRequestCard: React.FC<PartnerRequestCardProps> = ({
           <p className="text-sm text-muted-foreground">
             <strong className="text-foreground">Your task:</strong> Buy this item 
             {maxBudget ? ` (max ₹${maxBudget})` : ''} and deliver it to the buyer.
-            You'll be reimbursed for the item + earn ₹{request.estimated_fare}.
+            You'll be reimbursed for the item + earn ₹{request.reward || 0}.
           </p>
         </div>
       </div>
@@ -117,7 +117,7 @@ export const PartnerRequestCard: React.FC<PartnerRequestCardProps> = ({
       <div className="flex items-center justify-between pt-4 border-t border-border">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock className="w-3.5 h-3.5" />
-          Posted {format(new Date(request.created_at), 'MMM d, h:mm a')}
+          Posted {format(new Date(request.created_at || new Date()), 'MMM d, h:mm a')}
         </div>
         <Button 
           onClick={() => onAccept(request.id)}

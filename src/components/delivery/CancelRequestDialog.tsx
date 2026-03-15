@@ -38,15 +38,23 @@ export const CancelRequestDialog: React.FC<CancelRequestDialogProps> = ({
     setLoading(true);
     try {
       const { error } = await supabase
-        .from('delivery_requests')
+        .from('requests')
         .update({
           status: 'cancelled',
           cancellation_reason: reason || 'Cancelled by user',
           cancelled_by: user.id,
         })
         .eq('id', deliveryRequestId)
-        .eq('user_id', user.id) // Ensure user owns this request
-        .in('status', ['pending', 'matched']); // Only allow cancelling pending/matched
+        .eq('buyer_id', user.id)
+        .in('status', ['pending', 'matched']);
+
+      if (error) throw error;
+
+      // Also try to update deliveries table if it exists
+      await supabase
+        .from('deliveries')
+        .update({ status: 'cancelled' })
+        .eq('request_id', deliveryRequestId);
 
       if (error) throw error;
 

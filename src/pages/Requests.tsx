@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ShoppingBag, Plus, MapPin, Clock, CheckCircle, Truck, AlertCircle, LogOut, Route, MessageCircle, Wallet, Star, Package, Navigation, X, Shield, AlertTriangle, HelpCircle } from 'lucide-react';
+import { ShoppingBag, Plus, MapPin, Clock, CheckCircle, Truck, AlertCircle, LogOut, Route, MessageCircle, Wallet, Star, Package, Navigation, X, Shield, AlertTriangle, HelpCircle, Loader2 } from 'lucide-react';
+import { useParams, useLocation } from 'react-router-dom';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
@@ -14,12 +15,24 @@ import { CancelRequestDialog } from '@/components/delivery/CancelRequestDialog';
 import { ExportDeliveryHistory } from '@/components/delivery/ExportDeliveryHistory';
 import { RaiseDisputeDialog } from '@/components/disputes/RaiseDisputeDialog';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+import { Card, CardContent } from '@/components/ui/card';
 import { useLocationTracking } from '@/hooks/useLocationTracking';
 import { useAdminCheck } from '@/hooks/useAdminCheck';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { useCarrierAvailability } from '@/hooks/useCarrierAvailability';
+import { useNearbyRequests } from '@/hooks/useNearbyRequests';
+import { useCarrierDeliveries } from '@/hooks/useCarrierDeliveries';
+import { useTrustScore } from '@/hooks/useTrustScore';
+import { CarrierToggle } from '@/components/carrier/CarrierToggle';
+import { PartnerRequestCard } from '@/components/partner/PartnerRequestCard';
+import { ActiveDeliveryCard } from '@/components/carrier/ActiveDeliveryCard';
+import { TrustScoreCard } from '@/components/trust/TrustScoreCard';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type RequestRow = Database['public']['Tables']['requests']['Row'];
+type Delivery = Database['public']['Tables']['deliveries']['Row'] & {
+  requests: RequestRow | null;
+};
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   pending: { icon: Clock, color: 'text-yellow-600 bg-yellow-100', label: 'Finding Partner' },
@@ -30,50 +43,68 @@ const statusConfig: Record<string, { icon: React.ElementType; color: string; lab
   cancelled: { icon: AlertCircle, color: 'text-red-600 bg-red-100', label: 'Cancelled' },
 };
 
-const Dashboard: React.FC = () => {
-  const { user, signOut } = useAuth();
+const Requests: React.FC = () => {
+  const { id } = useParams();
+  const location = useLocation();
+  const { user, signOut, isPartner } = useAuth();
   const { isAdmin } = useAdminCheck();
   const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding();
-  const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
+  const [userRequests, setUserRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [chatDeliveryId, setChatDeliveryId] = useState<string | null>(null);
-  const [ratingDelivery, setRatingDelivery] = useState<DeliveryRequest | null>(null);
   const [trackingDeliveryId, setTrackingDeliveryId] = useState<string | null>(null);
   const [cancelDeliveryId, setCancelDeliveryId] = useState<string | null>(null);
-  const [disputeDelivery, setDisputeDelivery] = useState<DeliveryRequest | null>(null);
+  const [ratingRequest, setRatingRequest] = useState<RequestRow | null>(null);
+  const [disputeRequest, setDisputeRequest] = useState<RequestRow | null>(null);
 
-  const fetchDeliveries = async () => {
+  // Partner Hooks
+  const { availability, isOnline, toggleOnline, updating: partnerUpdating } = useCarrierAvailability();
+  const { requests: nearbyRequests, loading: requestsLoading } = useNearbyRequests();
+  const { 
+    activeDeliveries: partnerActiveTasks, 
+    completedDeliveries: partnerHistory,
+    acceptRequest, 
+    updateStatus, 
+    refetch: refetchPartnerData 
+  } = useCarrierDeliveries();
+  const { trustScore } = useTrustScore();
+  const [partnerModeActive, setPartnerModeActive] = useState(false);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
+  const fetchUserRequests = async () => {
+    if (!user) return;
     const { data, error } = await supabase
-      .from('delivery_requests')
+      .from('requests')
       .select('*')
+      .eq('buyer_id', user.id)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setDeliveries(data);
+      setUserRequests(data);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchDeliveries();
+    fetchUserRequests();
 
-    // Subscribe to realtime updates for user's deliveries
+    // Subscribe to realtime updates for user's requests
     const channel = supabase
-      .channel('user-deliveries')
+      .channel('user-requests')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'delivery_requests',
+          table: 'requests',
         },
         (payload) => {
-          const newDelivery = payload.new as DeliveryRequest;
-          const oldDelivery = payload.old as DeliveryRequest;
+          const newRequest = payload.new as RequestRow;
+          const oldRequest = payload.old as RequestRow;
           
-          // Refresh if it's our delivery
-          if (newDelivery?.user_id === user?.id || oldDelivery?.user_id === user?.id) {
-            fetchDeliveries();
+          // Refresh if it's our request
+          if (newRequest?.buyer_id === user?.id || oldRequest?.buyer_id === user?.id) {
+            fetchUserRequests();
           }
         }
       )
@@ -84,8 +115,18 @@ const Dashboard: React.FC = () => {
     };
   }, [user?.id]);
 
-  const activeDeliveries = deliveries.filter(d => !['delivered', 'cancelled'].includes(d.status));
-  const pastDeliveries = deliveries.filter(d => ['delivered', 'cancelled'].includes(d.status));
+  useEffect(() => {
+    if (id) {
+      if (location.pathname.includes('/chat/')) {
+        setChatDeliveryId(id);
+      } else if (location.pathname.includes('/delivery/')) {
+        setTrackingDeliveryId(id);
+      }
+    }
+  }, [id, location.pathname]);
+
+  const activeRequests = userRequests.filter(r => !['delivered', 'cancelled'].includes(r.status || ''));
+  const pastRequests = userRequests.filter(r => ['delivered', 'cancelled'].includes(r.status || ''));
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -146,29 +187,110 @@ const Dashboard: React.FC = () => {
               </Link>
             </Button>
 
-            {useAuth().isPartner && (
-              <Button variant="secondary" asChild className="border-primary/20 bg-primary/5 hover:bg-primary/10">
-                <Link to="/partner">
-                  <Route className="w-4 h-4 mr-2" />
-                  Partner Mode
-                </Link>
+            {isPartner && (
+              <Button 
+                variant={partnerModeActive ? "default" : "outline"} 
+                onClick={() => setPartnerModeActive(!partnerModeActive)}
+                className={partnerModeActive ? "" : "border-primary/20 bg-primary/5 hover:bg-primary/10"}
+              >
+                <Route className="w-4 h-4 mr-2" />
+                {partnerModeActive ? "Switch to User Mode" : "Partner Mode"}
               </Button>
             )}
 
-            <Button asChild size="lg">
-              <Link to="/request">
-                <Plus className="w-5 h-5 mr-2" />
-                New Request
-              </Link>
-            </Button>
+            {!partnerModeActive && (
+              <Button asChild size="lg">
+                <Link to="/request">
+                  <Plus className="w-5 h-5 mr-2" />
+                  New Request
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
 
-        {loading ? (
+        {partnerModeActive ? (
+          /* Partner Integrated View */
+          <div className="space-y-8">
+            <CarrierToggle
+              isOnline={isOnline}
+              onToggle={toggleOnline}
+              updating={partnerUpdating}
+            />
+
+            <TrustScoreCard trustScore={trustScore} />
+
+            {partnerActiveTasks.length > 0 && (
+              <section>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Truck className="w-5 h-5" />
+                  My Active Tasks ({partnerActiveTasks.length})
+                </h2>
+                <div className="space-y-4">
+                  {partnerActiveTasks.map((delivery) => (
+                    <ActiveDeliveryCard
+                      key={delivery.id}
+                      delivery={delivery}
+                      onUpdateStatus={updateStatus}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <MapPin className="w-5 h-5" />
+                  Nearby Requests
+                </h2>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+                  {isOnline ? 'Scanning for requests' : 'Go online to see requests'}
+                </div>
+              </div>
+
+              {!isOnline ? (
+                <Card className="bg-muted/50 border-dashed">
+                  <CardContent className="py-10 text-center">
+                    <Route className="w-10 h-10 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="text-muted-foreground">Go online to start seeing nearby delivery requests.</p>
+                  </CardContent>
+                </Card>
+              ) : requestsLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin" /></div>
+              ) : nearbyRequests.length === 0 ? (
+                <Card className="bg-muted/50 border-dashed">
+                  <CardContent className="py-10 text-center">
+                    <p className="text-muted-foreground">No nearby requests found. Try adjusting your detour settings.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {nearbyRequests.map((request) => (
+                    <PartnerRequestCard
+                      key={request.id}
+                      request={request as any}
+                      onAccept={async (id) => {
+                        setAcceptingId(id);
+                        await acceptRequest(id);
+                        setAcceptingId(null);
+                      }}
+                      accepting={acceptingId === request.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        ) : (
+          /* User View (Existing) */
+          <>
+          {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
           </div>
-        ) : deliveries.length === 0 ? (
+        ) : userRequests.length === 0 ? (
           /* Empty State */
           <div className="text-center py-20">
             <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6">
@@ -188,27 +310,27 @@ const Dashboard: React.FC = () => {
         ) : (
           <div className="space-y-8">
             {/* Active Requests */}
-            {activeDeliveries.length > 0 && (
+            {activeRequests.length > 0 && (
               <section>
-                <h2 className="text-lg font-semibold mb-4">Active ({activeDeliveries.length})</h2>
+                <h2 className="text-lg font-semibold mb-4">Active ({activeRequests.length})</h2>
                 <div className="grid gap-4">
-                  {activeDeliveries.map((delivery) => (
+                  {activeRequests.map((request) => (
                     <RequestCard 
-                      key={delivery.id} 
-                      delivery={delivery} 
-                      onChatClick={() => setChatDeliveryId(delivery.id)}
+                      key={request.id} 
+                      request={request as any} 
+                      onChatClick={() => setChatDeliveryId(request.id)}
                       onTrackClick={
-                        delivery.status === 'in_transit' 
-                          ? () => setTrackingDeliveryId(trackingDeliveryId === delivery.id ? null : delivery.id)
+                        request.status === 'in_transit' 
+                          ? () => setTrackingDeliveryId(trackingDeliveryId === request.id ? null : request.id)
                           : undefined
                       }
                       onCancelClick={
-                        ['pending', 'matched'].includes(delivery.status)
-                          ? () => setCancelDeliveryId(delivery.id)
+                        ['pending', 'matched'].includes(request.status || '')
+                          ? () => setCancelDeliveryId(request.id)
                           : undefined
                       }
-                      isTracking={trackingDeliveryId === delivery.id}
-                      showMap={trackingDeliveryId === delivery.id}
+                      isTracking={trackingDeliveryId === request.id}
+                      showMap={trackingDeliveryId === request.id}
                     />
                   ))}
                 </div>
@@ -216,25 +338,25 @@ const Dashboard: React.FC = () => {
             )}
 
             {/* Past Requests */}
-            {pastDeliveries.length > 0 && (
+            {pastRequests.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold">Past Requests</h2>
-                  <ExportDeliveryHistory deliveries={pastDeliveries} />
+                  <ExportDeliveryHistory deliveries={pastRequests as any} />
                 </div>
                 <div className="grid gap-4">
-                  {pastDeliveries.map((delivery) => (
+                  {pastRequests.map((request: any) => (
                     <RequestCard 
-                      key={delivery.id} 
-                      delivery={delivery}
+                      key={request.id} 
+                      request={request}
                       onRateClick={
-                        delivery.status === 'delivered' && !delivery.sender_rated && delivery.carrier_id
-                          ? () => setRatingDelivery(delivery)
+                        request.status === 'delivered' && !request.deliveries?.[0]?.buyer_rated && request.deliveries?.[0]?.partner_id
+                          ? () => setRatingRequest(request)
                           : undefined
                       }
                       onDisputeClick={
-                        delivery.status === 'delivered' && delivery.carrier_id
-                          ? () => setDisputeDelivery(delivery)
+                        request.status === 'delivered' && request.deliveries?.[0]?.partner_id
+                          ? () => setDisputeRequest(request)
                           : undefined
                       }
                     />
@@ -243,6 +365,8 @@ const Dashboard: React.FC = () => {
               </section>
             )}
           </div>
+        )}
+          </>
         )}
       </main>
 
@@ -253,15 +377,15 @@ const Dashboard: React.FC = () => {
         otherPartyName="Partner"
       />
 
-      {ratingDelivery && (
+      {ratingRequest && (
         <RatingDialog
-          open={!!ratingDelivery}
-          onOpenChange={(open) => !open && setRatingDelivery(null)}
-          deliveryRequestId={ratingDelivery.id}
-          ratedUserId={ratingDelivery.carrier_id!}
+          open={!!ratingRequest}
+          onOpenChange={(open) => !open && setRatingRequest(null)}
+          deliveryRequestId={ratingRequest.id}
+          ratedUserId={((ratingRequest as any).deliveries?.[0]?.partner_id) || ''}
           raterRole="sender"
           otherPartyName="Partner"
-          onRated={fetchDeliveries}
+          onRated={fetchUserRequests}
         />
       )}
 
@@ -269,7 +393,7 @@ const Dashboard: React.FC = () => {
         open={!!cancelDeliveryId}
         onOpenChange={(open) => !open && setCancelDeliveryId(null)}
         deliveryRequestId={cancelDeliveryId || ''}
-        onCancelled={fetchDeliveries}
+        onCancelled={fetchUserRequests}
       />
 
       <OnboardingModal
@@ -278,12 +402,12 @@ const Dashboard: React.FC = () => {
         onSkip={skipOnboarding}
       />
 
-      {disputeDelivery && (
+      {disputeRequest && (
         <RaiseDisputeDialog
-          open={!!disputeDelivery}
-          onOpenChange={(open) => !open && setDisputeDelivery(null)}
-          deliveryRequestId={disputeDelivery.id}
-          againstUserId={disputeDelivery.carrier_id!}
+          open={!!disputeRequest}
+          onOpenChange={(open) => !open && setDisputeRequest(null)}
+          deliveryRequestId={disputeRequest.id}
+          againstUserId={((disputeRequest as any).deliveries?.[0]?.partner_id) || ''}
         />
       )}
     </div>
@@ -291,7 +415,7 @@ const Dashboard: React.FC = () => {
 };
 
 interface RequestCardProps {
-  delivery: DeliveryRequest;
+  request: RequestRow & { deliveries?: Database['public']['Tables']['deliveries']['Row'][] };
   onChatClick?: () => void;
   onRateClick?: () => void;
   onTrackClick?: () => void;
@@ -301,20 +425,21 @@ interface RequestCardProps {
   showMap?: boolean;
 }
 
-const RequestCard: React.FC<RequestCardProps> = ({ delivery, onChatClick, onRateClick, onTrackClick, onCancelClick, onDisputeClick, isTracking, showMap }) => {
-  const status = statusConfig[delivery.status] || statusConfig.pending;
+const RequestCard: React.FC<RequestCardProps> = ({ request, onChatClick, onRateClick, onTrackClick, onCancelClick, onDisputeClick, isTracking, showMap }) => {
+  const status = statusConfig[request.status || 'pending'] || statusConfig.pending;
+  const delivery = request.deliveries?.[0];
   const StatusIcon = status.icon;
-  const canChat = delivery.carrier_id && !['delivered', 'cancelled'].includes(delivery.status);
-  const canTrack = delivery.status === 'in_transit';
-  const canCancel = ['pending', 'matched'].includes(delivery.status);
-  const canDispute = delivery.status === 'delivered' && delivery.carrier_id;
+  const canChat = delivery?.partner_id && !['delivered', 'cancelled'].includes(request.status || '');
+  const canTrack = request.status === 'in_transit';
+  const canCancel = ['pending', 'matched'].includes(request.status || '');
+  const canDispute = request.status === 'delivered' && delivery?.partner_id;
   
   // Show pickup OTP when matched, drop OTP when in_transit
-  const showPickupOtp = delivery.status === 'matched' && delivery.pickup_otp;
-  const showDropOtp = delivery.status === 'in_transit' && delivery.drop_otp;
+  const showPickupOtp = request.status === 'matched' && delivery?.pickup_otp;
+  const showDropOtp = request.status === 'in_transit' && delivery?.drop_otp;
   
   const { partnerLocation } = useLocationTracking({
-    deliveryRequestId: showMap ? delivery.id : undefined,
+    deliveryRequestId: showMap ? request.id : undefined,
     isPartner: false,
   });
 
@@ -326,13 +451,13 @@ const RequestCard: React.FC<RequestCardProps> = ({ delivery, onChatClick, onRate
             <ShoppingBag className="w-6 h-6" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold truncate">{delivery.item_description}</h3>
+            <h3 className="font-semibold truncate">{request.item_name || request.item_description}</h3>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
               <MapPin className="w-4 h-4 shrink-0" />
-              <span className="truncate">Delivering to {delivery.drop_city}</span>
+              <span className="truncate">Delivering to {request.drop_city}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {format(new Date(delivery.created_at), 'MMM d, yyyy • h:mm a')}
+              {format(new Date(request.created_at), 'MMM d, yyyy • h:mm a')}
             </p>
           </div>
         </div>
@@ -377,7 +502,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ delivery, onChatClick, onRate
               <StatusIcon className="w-3.5 h-3.5" />
               {status.label}
             </div>
-            <p className="font-semibold">₹{delivery.estimated_fare}</p>
+            <p className="font-semibold">₹{request.reward || 0}</p>
           </div>
         </div>
       </div>
@@ -397,7 +522,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ delivery, onChatClick, onRate
               </p>
             </div>
             <div className="text-2xl font-mono font-bold tracking-wider text-amber-800 dark:text-amber-300">
-              {showPickupOtp ? delivery.pickup_otp : delivery.drop_otp}
+              {showPickupOtp ? (delivery?.pickup_otp || '----') : (delivery?.drop_otp || '----')}
             </div>
           </div>
         </div>
@@ -407,8 +532,8 @@ const RequestCard: React.FC<RequestCardProps> = ({ delivery, onChatClick, onRate
       {showMap && (
         <LiveTrackingMap 
           partnerLocation={partnerLocation}
-          pickupAddress={delivery.pickup_address}
-          dropAddress={delivery.drop_address}
+          pickupAddress={request.pickup_address || ''}
+          dropAddress={request.drop_address || ''}
           className="h-64 mt-4"
         />
       )}
@@ -416,4 +541,4 @@ const RequestCard: React.FC<RequestCardProps> = ({ delivery, onChatClick, onRate
   );
 };
 
-export default Dashboard;
+export default Requests;

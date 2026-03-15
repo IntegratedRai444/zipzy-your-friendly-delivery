@@ -66,9 +66,9 @@ const HeroSection = () => {
             >
               {user ? (
                 <Button variant="hero" size="xl" className="group" asChild>
-                  <Link to="/dashboard">
+                  <Link to="/request">
                     <ShoppingBag className="w-5 h-5" />
-                    Go to Dashboard
+                    Request Something
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                   </Link>
                 </Button>

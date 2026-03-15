@@ -5,28 +5,33 @@ import { useToast } from '@/hooks/use-toast';
 import { notifyDeliveryStatusChange } from '@/hooks/useTriggerPushNotification';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
-type DeliveryStatus = Database['public']['Enums']['delivery_status'];
+type Delivery = Database['public']['Tables']['deliveries']['Row'] & {
+  requests: Database['public']['Tables']['requests']['Row'] | null;
+};
 
 export const useCarrierDeliveries = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchDeliveries = useCallback(async () => {
     if (!user) return;
 
+    // Fetch deliveries where the partner is assigned, joining with the request details
     const { data, error } = await supabase
-      .from('delivery_requests')
-      .select('*')
-      .or(`carrier_id.eq.${user.id},partner_id.eq.${user.id}`)
-      .order('created_at', { ascending: false });
+      .from('deliveries')
+      .select(`
+        *,
+        requests (*)
+      `)
+      .eq('partner_id', user.id)
+      .order('accepted_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching carrier deliveries:', error);
     } else {
-      setDeliveries(data || []);
+      setDeliveries((data as any[]) || []);
     }
     setLoading(false);
   }, [user]);
@@ -34,7 +39,7 @@ export const useCarrierDeliveries = () => {
   useEffect(() => {
     fetchDeliveries();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates on 'deliveries' table
     const channel = supabase
       .channel('carrier-deliveries')
       .on(
@@ -42,12 +47,11 @@ export const useCarrierDeliveries = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'delivery_requests',
+          table: 'deliveries',
+          filter: `partner_id=eq.${user?.id}`,
         },
-        (payload) => {
-          if ((payload.new as DeliveryRequest)?.carrier_id === user?.id) {
-            fetchDeliveries();
-          }
+        () => {
+          fetchDeliveries();
         }
       )
       .subscribe();
@@ -61,35 +65,43 @@ export const useCarrierDeliveries = () => {
     if (!user) return false;
 
     try {
-      // Get the delivery first to get sender info
-      const { data: delivery } = await supabase
-        .from('delivery_requests')
-        .select('user_id, item_description')
+      // Get the request first to get buyer info
+      const { data: request } = await supabase
+        .from('requests')
+        .select('buyer_id, item_description')
         .eq('id', requestId)
         .single();
 
-      const { error } = await supabase
-        .from('delivery_requests')
-        .update({
-          carrier_id: user.id,
+      if (!request) throw new Error('Request not found');
+
+      // Create a new delivery record
+      const { error: deliveryError } = await supabase
+        .from('deliveries')
+        .insert({
+          request_id: requestId,
           partner_id: user.id,
-          status: 'matched' as DeliveryStatus,
-          matched_at: new Date().toISOString(),
-        })
+          status: 'matched',
+          accepted_at: new Date().toISOString(),
+        });
+
+      if (deliveryError) throw deliveryError;
+
+      // Update the request status
+      const { error: requestError } = await supabase
+        .from('requests')
+        .update({ status: 'matched' })
         .eq('id', requestId)
-        .eq('status', 'pending'); // Only accept if still pending
+        .eq('status', 'pending');
 
-      if (error) throw error;
+      if (requestError) throw requestError;
 
-      // Send push notification to sender
-      if (delivery) {
-        notifyDeliveryStatusChange(
-          delivery.user_id,
-          'matched',
-          delivery.item_description,
-          requestId
-        );
-      }
+      // Send push notification to buyer
+      notifyDeliveryStatusChange(
+        request.buyer_id || '',
+        'matched',
+        request.item_description || '',
+        requestId
+      );
 
       toast({
         title: 'Request accepted!',
@@ -108,18 +120,15 @@ export const useCarrierDeliveries = () => {
     }
   };
 
-  const updateStatus = async (requestId: string, status: DeliveryStatus) => {
+  const updateStatus = async (requestId: string, status: Database['public']['Enums']['delivery_status']) => {
     if (!user) return false;
 
     try {
-      // Get the delivery first to get sender info
-      const { data: delivery } = await supabase
-        .from('delivery_requests')
-        .select('user_id, item_description')
-        .eq('id', requestId)
-        .single();
+      // Find the delivery record
+      const delivery = deliveries.find(d => d.request_id === requestId);
+      if (!delivery) throw new Error('Delivery not found');
 
-      const updateData: Record<string, unknown> = { status };
+      const updateData: any = { status };
       
       if (status === 'picked_up') {
         updateData.picked_up_at = new Date().toISOString();
@@ -127,27 +136,34 @@ export const useCarrierDeliveries = () => {
         updateData.delivered_at = new Date().toISOString();
       }
 
-      const { error } = await supabase
-        .from('delivery_requests')
+      const { error: deliveryError } = await supabase
+        .from('deliveries')
         .update(updateData)
-        .eq('id', requestId)
-        .or(`carrier_id.eq.${user.id},partner_id.eq.${user.id}`);
+        .eq('id', delivery.id);
 
-      if (error) throw error;
+      if (deliveryError) throw deliveryError;
 
-      // Send push notification to sender
-      if (delivery) {
+      // Also update the request status for historical tracking
+      const { error: requestError } = await supabase
+        .from('requests')
+        .update({ status })
+        .eq('id', requestId);
+
+      if (requestError) throw requestError;
+
+      // Send push notification to buyer
+      if (delivery.requests) {
         notifyDeliveryStatusChange(
-          delivery.user_id,
-          status,
-          delivery.item_description,
+          delivery.requests.buyer_id || '',
+          status as any,
+          delivery.requests.item_description || '',
           requestId
         );
       }
 
       toast({
         title: 'Status updated',
-        description: `Delivery marked as ${status.replace('_', ' ')}`,
+        description: `Delivery marked as ${status ? status.replace('_', ' ') : ''}`,
       });
       fetchDeliveries();
       return true;
@@ -163,11 +179,11 @@ export const useCarrierDeliveries = () => {
   };
 
   const activeDeliveries = deliveries.filter(
-    d => !['delivered', 'cancelled'].includes(d.status)
+    d => !['delivered', 'cancelled'].includes(d.status || '')
   );
 
   const completedDeliveries = deliveries.filter(
-    d => ['delivered', 'cancelled'].includes(d.status)
+    d => ['delivered', 'cancelled'].includes(d.status || '')
   );
 
   return {

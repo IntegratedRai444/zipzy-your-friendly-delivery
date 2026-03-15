@@ -60,12 +60,12 @@ export const ProofOfPurchaseUpload: React.FC<ProofOfPurchaseUploadProps> = ({
 
       // Update delivery request
       const { error: updateError } = await supabase
-        .from('delivery_requests')
+        .from('deliveries')
         .update({
           purchase_proof_url: urlData.publicUrl,
           purchase_proof_uploaded_at: new Date().toISOString(),
         })
-        .eq('id', deliveryRequestId);
+        .eq('request_id', deliveryRequestId);
 
       if (updateError) throw updateError;
 

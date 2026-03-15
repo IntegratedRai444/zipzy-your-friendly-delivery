@@ -4,15 +4,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
-type CarrierAvailability = Database['public']['Tables']['carrier_availability']['Row'];
+type CarrierAvailability = Database['public']['Tables']['partner_locations']['Row'];
 type ItemSize = Database['public']['Enums']['item_size'];
 
 interface CarrierSettings {
-  destinationCity: string;
-  destinationAddress: string;
   maxDetourKm: number;
-  maxItemSize: ItemSize;
-  availableUntil: Date | null;
 }
 
 export const useCarrierAvailability = () => {
@@ -26,9 +22,9 @@ export const useCarrierAvailability = () => {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('carrier_availability')
+      .from('partner_locations')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('partner_id', user.id)
       .maybeSingle();
 
     if (error) {
@@ -50,9 +46,9 @@ export const useCarrierAvailability = () => {
     try {
       if (availability) {
         const { error } = await supabase
-          .from('carrier_availability')
+          .from('partner_locations')
           .update({ is_online: !availability.is_online, updated_at: new Date().toISOString() })
-          .eq('user_id', user.id);
+          .eq('partner_id', user.id);
 
         if (error) throw error;
         setAvailability({ ...availability, is_online: !availability.is_online });
@@ -65,8 +61,8 @@ export const useCarrierAvailability = () => {
       } else {
         // Create initial availability record
         const { data, error } = await supabase
-          .from('carrier_availability')
-          .insert({ user_id: user.id, is_online: true })
+          .from('partner_locations')
+          .insert({ partner_id: user.id, is_online: true, latitude: 0, longitude: 0 }) // Lat/Lng are required in types.ts
           .select()
           .single();
 
@@ -89,32 +85,28 @@ export const useCarrierAvailability = () => {
     }
   };
 
-  const updateSettings = async (settings: CarrierSettings) => {
+  const updateSettings = async (settings: Partial<CarrierSettings>) => {
     if (!user) return;
     setUpdating(true);
 
     try {
       const updateData = {
-        destination_city: settings.destinationCity,
-        destination_address: settings.destinationAddress,
-        max_detour_km: settings.maxDetourKm,
-        max_item_size: settings.maxItemSize,
-        available_until: settings.availableUntil?.toISOString() || null,
+        max_detour_km: settings.maxDetourKm ?? availability?.max_detour_km,
         updated_at: new Date().toISOString(),
       };
 
       if (availability) {
         const { error } = await supabase
-          .from('carrier_availability')
+          .from('partner_locations')
           .update(updateData)
-          .eq('user_id', user.id);
+          .eq('partner_id', user.id);
 
         if (error) throw error;
         setAvailability({ ...availability, ...updateData } as CarrierAvailability);
       } else {
         const { data, error } = await supabase
-          .from('carrier_availability')
-          .insert({ user_id: user.id, ...updateData })
+          .from('partner_locations')
+          .insert({ partner_id: user.id, ...updateData, latitude: 0, longitude: 0 })
           .select()
           .single();
 

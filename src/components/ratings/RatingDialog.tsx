@@ -57,11 +57,11 @@ export const RatingDialog: React.FC<RatingDialogProps> = ({
       if (ratingError) throw ratingError;
 
       // Update the delivery to mark as rated
-      const updateField = raterRole === 'sender' ? 'sender_rated' : 'carrier_rated';
+      const updateField = raterRole === 'sender' ? 'buyer_rated' : 'partner_rated';
       await supabase
-        .from('delivery_requests')
+        .from('deliveries')
         .update({ [updateField]: true })
-        .eq('id', deliveryRequestId);
+        .eq('request_id', deliveryRequestId);
 
       toast({
         title: 'Thank you!',

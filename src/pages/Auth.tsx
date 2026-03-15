@@ -45,7 +45,7 @@ const Auth: React.FC = () => {
   useEffect(() => {
     // Only auto-redirect if NOT showing the partner selection modal AND not currently processing a login
     if (user && mode !== 'reset' && !showPartnerModal && !isProcessingAuth) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [user, navigate, mode, showPartnerModal, isProcessingAuth]);
 
@@ -84,7 +84,7 @@ const Auth: React.FC = () => {
   const handlePartnerChoice = (choice: boolean) => {
     setIsPartner(choice);
     setShowPartnerModal(false);
-    navigate('/');
+    navigate('/dashboard');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,7 +136,7 @@ const Auth: React.FC = () => {
       }
 
       toast.success('Password updated successfully!');
-      navigate('/');
+      navigate('/dashboard');
       return;
     }
 
@@ -267,7 +267,7 @@ const Auth: React.FC = () => {
           <div className="space-y-6">
             <h1 className="text-4xl md:text-5xl font-display font-bold leading-tight">
               Want it <span className="italic">there</span>,<br />
-              but <span className="italic text-primary">can't</span> go?
+              but <span className="italic opacity-60">can't</span> go?
             </h1>
             <p className="text-lg text-background/70 max-w-md">
               Someone else is already heading there. They can buy it and bring it for you.

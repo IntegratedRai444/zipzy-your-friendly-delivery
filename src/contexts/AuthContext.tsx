@@ -31,32 +31,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPartner, setIsPartner] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('isPartner') === 'true';
-    }
-    return false;
-  });
+  const [isPartner, setIsPartner] = useState(false);
 
-  const handleSetIsPartner = (value: boolean) => {
+  const fetchUserRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'partner')
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching user role:', error);
+      }
+      
+      const hasPartnerRole = !!data;
+      setIsPartner(hasPartnerRole);
+      localStorage.setItem('isPartner', hasPartnerRole.toString());
+    } catch (err) {
+      console.error('Catch error fetching user role:', err);
+    }
+  };
+
+  const handleSetIsPartner = async (value: boolean) => {
     setIsPartner(value);
     localStorage.setItem('isPartner', value.toString());
+
+    if (user && value) {
+      // Upsert partner role in DB
+      const { error } = await supabase
+        .from('user_roles')
+        .upsert({ user_id: user.id, role: 'partner' }, { onConflict: 'user_id,role' });
+      
+      if (error) {
+        console.error('Error updating user role:', error);
+      }
+    }
   };
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchUserRole(session.user.id);
+        } else {
+          setIsPartner(false);
+          localStorage.removeItem('isPartner');
+        }
+        
         setLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        await fetchUserRole(session.user.id);
+      }
+      
       setLoading(false);
     });
 

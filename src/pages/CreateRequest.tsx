@@ -119,31 +119,29 @@ const CreateRequest: React.FC = () => {
         ? validated.buy_from_shop 
         : '';
 
-      const { error } = await supabase.from('delivery_requests').insert([{
-        user_id: user?.id as string,
+      const { error } = await supabase.from('requests').insert([{
+        buyer_id: user?.id as string,
+        item_name: validated.item_description,
         item_description: fullDescription,
         item_size: 'small', // Default for purchase requests
         pickup_address: pickupShop || pickupArea,
         pickup_city: pickupArea,
-        pickup_phone: validated.drop_phone, // Use buyer's phone
-        pickup_instructions: wantBudgetLimit && validated.max_budget 
+        pickup_notes: wantBudgetLimit && validated.max_budget 
           ? `Max budget: ₹${validated.max_budget}` 
           : 'No budget limit set',
         drop_address: validated.drop_address,
         drop_city: validated.drop_city,
-        drop_phone: validated.drop_phone,
-        drop_instructions: validated.drop_instructions || null,
+        drop_notes: validated.drop_instructions || null,
         urgency: validated.urgency === 'flexible' ? 'standard' : validated.urgency === 'today' ? 'express' : 'urgent',
-        estimated_fare: partnerReward,
+        reward: partnerReward,
         item_value: validated.max_budget || 0,
         platform_fee: platformFee,
-        pickup_otp: generateOTP(),
-        drop_otp: generateOTP(),
+        status: 'pending',
       }]);
       
       if (error) throw error;
       
-      toast.success('Request created! A nearby partner will pick this up soon.');
+      toast.success("Request created successfully!");
       navigate('/dashboard');
     } catch (err) {
       if (err instanceof z.ZodError) {

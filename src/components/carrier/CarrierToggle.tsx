@@ -6,14 +6,12 @@ interface CarrierToggleProps {
   isOnline: boolean;
   onToggle: () => void;
   updating: boolean;
-  destinationCity?: string | null;
 }
 
 export const CarrierToggle: React.FC<CarrierToggleProps> = ({
   isOnline,
   onToggle,
   updating,
-  destinationCity,
 }) => {
   return (
     <div className={`rounded-2xl border p-6 transition-all ${
@@ -52,14 +50,6 @@ export const CarrierToggle: React.FC<CarrierToggleProps> = ({
           />
         </div>
       </div>
-
-      {isOnline && destinationCity && (
-        <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-900">
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Destination:</span> {destinationCity}
-          </p>
-        </div>
-      )}
     </div>
   );
 };

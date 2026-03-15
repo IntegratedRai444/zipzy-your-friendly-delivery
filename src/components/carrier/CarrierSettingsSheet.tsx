@@ -22,16 +22,12 @@ import { Settings } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type ItemSize = Database['public']['Enums']['item_size'];
-type CarrierAvailability = Database['public']['Tables']['carrier_availability']['Row'];
+type CarrierAvailability = Database['public']['Tables']['partner_locations']['Row'];
 
 interface CarrierSettingsSheetProps {
   availability: CarrierAvailability | null;
   onSave: (settings: {
-    destinationCity: string;
-    destinationAddress: string;
     maxDetourKm: number;
-    maxItemSize: ItemSize;
-    availableUntil: Date | null;
   }) => void;
   saving?: boolean;
 }
@@ -42,18 +38,11 @@ export const CarrierSettingsSheet: React.FC<CarrierSettingsSheetProps> = ({
   saving,
 }) => {
   const [open, setOpen] = useState(false);
-  const [destinationCity, setDestinationCity] = useState(availability?.destination_city || '');
-  const [destinationAddress, setDestinationAddress] = useState(availability?.destination_address || '');
   const [maxDetourKm, setMaxDetourKm] = useState(Number(availability?.max_detour_km) || 5);
-  const [maxItemSize, setMaxItemSize] = useState<ItemSize>(availability?.max_item_size || 'medium');
 
   const handleSave = () => {
     onSave({
-      destinationCity,
-      destinationAddress,
       maxDetourKm,
-      maxItemSize,
-      availableUntil: null,
     });
     setOpen(false);
   };
@@ -75,26 +64,6 @@ export const CarrierSettingsSheet: React.FC<CarrierSettingsSheetProps> = ({
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
-          <div className="space-y-2">
-            <Label htmlFor="destination-city">Where are you going?</Label>
-            <Input
-              id="destination-city"
-              placeholder="e.g., Mumbai, Delhi"
-              value={destinationCity}
-              onChange={(e) => setDestinationCity(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="destination-address">Destination Address (Optional)</Label>
-            <Input
-              id="destination-address"
-              placeholder="Specific area or landmark"
-              value={destinationAddress}
-              onChange={(e) => setDestinationAddress(e.target.value)}
-            />
-          </div>
-
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>Max Detour Distance</Label>
@@ -112,25 +81,10 @@ export const CarrierSettingsSheet: React.FC<CarrierSettingsSheetProps> = ({
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label>Maximum Item Size</Label>
-            <Select value={maxItemSize} onValueChange={(v) => setMaxItemSize(v as ItemSize)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="small">Small (fits in pocket)</SelectItem>
-                <SelectItem value="medium">Medium (fits in bag)</SelectItem>
-                <SelectItem value="large">Large (needs both hands)</SelectItem>
-                <SelectItem value="extra_large">Extra Large (needs vehicle)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <Button 
             className="w-full" 
             onClick={handleSave}
-            disabled={saving || !destinationCity}
+            disabled={saving}
           >
             {saving ? 'Saving...' : 'Save Settings'}
           </Button>

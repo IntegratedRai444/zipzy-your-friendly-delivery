@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Database } from '@/integrations/supabase/types';
 
-type DeliveryRequest = Database['public']['Tables']['delivery_requests']['Row'];
+type DeliveryRequest = Database['public']['Tables']['requests']['Row'];
 
 export const useNearbyRequests = () => {
   const { user } = useAuth();
@@ -13,12 +13,12 @@ export const useNearbyRequests = () => {
   const fetchRequests = useCallback(async () => {
     if (!user) return;
 
-    // Fetch pending requests - RLS will filter based on carrier availability
+    // Fetch pending requests from the actual 'requests' table
     const { data, error } = await supabase
-      .from('delivery_requests')
+      .from('requests')
       .select('*')
       .eq('status', 'pending')
-      .neq('user_id', user.id) // Don't show own requests
+      .neq('buyer_id', user.id) // Don't show own requests
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -32,7 +32,7 @@ export const useNearbyRequests = () => {
   useEffect(() => {
     fetchRequests();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates on 'requests' table
     const channel = supabase
       .channel('nearby-requests')
       .on(
@@ -40,7 +40,7 @@ export const useNearbyRequests = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'delivery_requests',
+          table: 'requests',
           filter: 'status=eq.pending',
         },
         () => {

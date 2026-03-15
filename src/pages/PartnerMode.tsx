@@ -101,7 +101,6 @@ const PartnerMode: React.FC = () => {
           isOnline={isOnline}
           onToggle={toggleOnline}
           updating={updating}
-          destinationCity={availability?.destination_city}
         />
 
         {/* Active Tasks */}
@@ -193,7 +192,7 @@ const PartnerMode: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 {completedDeliveries.map((delivery) => {
-                  const canRate = delivery.status === 'delivered' && !delivery.carrier_rated && delivery.user_id;
+                  const canRate = delivery.status === 'delivered' && !delivery.partner_rated && delivery.requests?.buyer_id;
                   return (
                     <div 
                       key={delivery.id}
@@ -201,9 +200,9 @@ const PartnerMode: React.FC = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{delivery.item_description}</p>
+                          <p className="font-medium">{delivery.requests?.item_description}</p>
                           <p className="text-sm text-muted-foreground">
-                            {delivery.pickup_city} → {delivery.drop_city}
+                            {delivery.requests?.pickup_city} → {delivery.requests?.drop_city}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -218,7 +217,7 @@ const PartnerMode: React.FC = () => {
                             </Button>
                           )}
                           <div className="text-right">
-                            <p className="font-semibold text-green-600">+₹{delivery.estimated_fare}</p>
+                            <p className="font-semibold text-green-600">+₹{delivery.requests?.reward || 0}</p>
                             <p className={`text-xs ${
                               delivery.status === 'delivered' 
                                 ? 'text-green-600' 
@@ -246,8 +245,8 @@ const PartnerMode: React.FC = () => {
         <RatingDialog
           open={!!ratingDelivery}
           onOpenChange={(open) => !open && setRatingDelivery(null)}
-          deliveryRequestId={ratingDelivery.id}
-          ratedUserId={ratingDelivery.user_id}
+          deliveryRequestId={ratingDelivery.request_id || ''}
+          ratedUserId={ratingDelivery.requests?.buyer_id || ''}
           raterRole="carrier"
           otherPartyName="Buyer"
           onRated={refetch}
