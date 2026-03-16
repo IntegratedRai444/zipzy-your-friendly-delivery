@@ -60,6 +60,11 @@ export const PartnerRequestCard: React.FC<PartnerRequestCardProps> = ({
             {request.reward || 0}
           </div>
           <p className="text-xs text-muted-foreground">You'll earn</p>
+          {request.item_value && (
+            <p className="text-xs text-muted-foreground">
+              +₹{request.item_value} reimbursement
+            </p>
+          )}
         </div>
       </div>
 
@@ -108,7 +113,8 @@ export const PartnerRequestCard: React.FC<PartnerRequestCardProps> = ({
           <p className="text-sm text-muted-foreground">
             <strong className="text-foreground">Your task:</strong> Buy this item 
             {maxBudget ? ` (max ₹${maxBudget})` : ''} and deliver it to the buyer.
-            You'll be reimbursed for the item + earn ₹{request.reward || 0}.
+            You'll be reimbursed ₹{request.item_value || 0} for the item + earn ₹{request.reward || 0}.
+            Total reimbursement: ₹{(request.item_value || 0) + (request.reward || 0)}.
           </p>
         </div>
       </div>

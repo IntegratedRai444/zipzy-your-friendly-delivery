@@ -26,6 +26,7 @@ import PartnerOnboarding from "./pages/PartnerOnboarding";
 import PartnerMode from "./pages/PartnerMode";
 import PartnerEarnings from "./pages/PartnerEarnings";
 import PartnerTrips from "./pages/PartnerTrips";
+import DeliveryDetails from "./pages/DeliveryDetails";
 import { GlobalAIChat } from "@/components/chat/GlobalAIChat";
 
 const queryClient = new QueryClient();
@@ -78,7 +79,7 @@ const App = () => (
             } />
             <Route path="/delivery/:id" element={
               <ProtectedRoute>
-                <Requests />
+                <DeliveryDetails />
               </ProtectedRoute>
             } />
             <Route path="/chat/:id" element={

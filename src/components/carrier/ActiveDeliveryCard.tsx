@@ -128,21 +128,17 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
         {/* Fare Breakdown */}
         <div className="space-y-2 p-3 rounded-xl bg-muted mb-4 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Estimated Item Price</span>
-            <span>₹{delivery.requests?.estimated_price || 0}</span>
+            <span className="text-muted-foreground">Item Price</span>
+            <span>₹{delivery.requests?.item_value || 0}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Delivery Reward</span>
-            <span>₹{delivery.requests?.reward || 0}</span>
-          </div>
-          <div className="flex justify-between text-destructive">
-            <span className="text-muted-foreground">Platform Fee (20%)</span>
-            <span>-₹{delivery.requests?.platform_fee || 0}</span>
+            <span className="text-muted-foreground">You'll Earn</span>
+            <span className="text-green-600 font-semibold">₹{delivery.requests?.reward || 0}</span>
           </div>
           <div className="pt-2 border-t border-border flex justify-between font-bold">
-            <span>Estimated Total Payout</span>
+            <span>Total Reimbursement</span>
             <span className="text-primary text-lg">
-              ₹{(parseFloat(delivery.requests?.estimated_price as any || 0) + (parseFloat(delivery.requests?.reward as any || 0) * 0.8)).toFixed(2)}
+              ₹{(delivery.requests?.item_value || 0) + (delivery.requests?.reward || 0)}
             </span>
           </div>
         </div>

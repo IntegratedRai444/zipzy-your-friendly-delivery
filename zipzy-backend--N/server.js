@@ -54,6 +54,7 @@ app.get('/api', (req, res) => {
         'GET /api/requests/my': 'Get user\'s own requests',
         'GET /api/requests/:id': 'Get specific request details',
         'PATCH /api/requests/:id/status': 'Update request status',
+        'PATCH /api/requests/:id/accept': 'Accept a request (partner accepts)',
         'POST /api/requests/:id/otp': 'Generate OTP for request',
         'POST /api/requests/:id/otp/verify': 'Verify OTP for request'
       },
@@ -67,11 +68,11 @@ app.get('/api', (req, res) => {
         'PATCH /api/deliveries/:id/cancel': 'Cancel delivery'
       },
       chat: {
-        'POST /api/chat/send': 'Send message',
-        'GET /api/chat/:deliveryId': 'Get chat history for delivery',
-        'POST /api/chat/:deliveryId/read': 'Mark messages as read',
+        'GET /api/chat/messages/:requestId': 'Get chat messages for request',
+        'POST /api/chat/messages/:requestId': 'Send message in chat',
+        'GET /api/chat/subscribe/:requestId': 'Subscribe to chat updates (WebSocket)',
         'GET /api/chat/unread/count': 'Get unread message count',
-        'DELETE /api/chat/:messageId': 'Delete message',
+        'DELETE /api/chat/messages/:messageId': 'Delete message',
         'GET /api/chat/': 'Get all conversations for user'
       },
       wallet: {

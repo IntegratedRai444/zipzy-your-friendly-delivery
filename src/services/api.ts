@@ -14,6 +14,7 @@ async function getAuthHeader() {
 
 export const api = {
   async get(endpoint: string) {
+    console.log('API GET:', endpoint); // Debug log
     const headers = await getAuthHeader();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
@@ -22,8 +23,8 @@ export const api = {
       },
     });
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'API request failed');
+      const errorText = await response.text();
+      throw new Error(errorText || 'API request failed');
     }
     return response.json();
   },
@@ -39,8 +40,8 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'API request failed');
+      const errorText = await response.text();
+      throw new Error(errorText || 'API request failed');
     }
     return response.json();
   },
@@ -56,8 +57,8 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'API request failed');
+      const errorText = await response.text();
+      throw new Error(errorText || 'API request failed');
     }
     return response.json();
   },
@@ -71,8 +72,8 @@ export const api = {
       },
     });
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'API request failed');
+      const errorText = await response.text();
+      throw new Error(errorText || 'API request failed');
     }
     return response.json();
   },

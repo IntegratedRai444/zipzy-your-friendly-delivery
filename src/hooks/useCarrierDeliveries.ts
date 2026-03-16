@@ -19,20 +19,16 @@ export const useCarrierDeliveries = () => {
   const fetchDeliveries = useCallback(async () => {
     if (!user) return;
 
-    // Fetch deliveries where the partner is assigned, joining with the request details
-    const { data, error } = await supabase
-      .from('deliveries')
-      .select(`
-        *,
-        requests (*)
-      `)
-      .eq('partner_id', user.id)
-      .order('accepted_at', { ascending: false });
-
-    if (error) {
+    try {
+      const response = await api.get('/deliveries/my');
+      
+      if (response.success) {
+        setDeliveries(response.data.deliveries || []);
+      } else {
+        console.error('Error fetching carrier deliveries:', response.error);
+      }
+    } catch (error) {
       console.error('Error fetching carrier deliveries:', error);
-    } else {
-      setDeliveries((data as any[]) || []);
     }
     setLoading(false);
   }, [user]);
@@ -89,7 +85,7 @@ export const useCarrierDeliveries = () => {
     if (!user) return false;
 
     try {
-      // Find the delivery record
+      // Find delivery record
       const delivery = deliveries.find(d => d.request_id === requestId);
       if (!delivery) throw new Error('Delivery not found');
 
@@ -112,12 +108,13 @@ export const useCarrierDeliveries = () => {
     }
   };
 
+  // Use local filtering for active and completed deliveries
   const activeDeliveries = deliveries.filter(
-    d => !['delivered', 'cancelled'].includes(d.status || '')
+    d => !['delivered', 'completed', 'cancelled'].includes(d.status || '')
   );
 
   const completedDeliveries = deliveries.filter(
-    d => ['delivered', 'cancelled'].includes(d.status || '')
+    d => ['delivered', 'completed', 'cancelled'].includes(d.status || '')
   );
 
   return {

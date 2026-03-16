@@ -1,4 +1,5 @@
 const express = require('express');
+const { supabase } = require('../config/supabaseClient');
 const deliveryService = require('../services/deliveryService');
 const { authenticateUser, checkUserSafety } = require('../middleware/auth');
 const aiService = require('../services/aiService');
@@ -7,6 +8,91 @@ const router = express.Router();
 
 // Safety guard for all delivery operations
 router.use(authenticateUser, checkUserSafety);
+
+// Get delivery by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { data: delivery, error } = await supabase
+      .from('deliveries')
+      .select(`
+        *,
+        requests:requests!inner(
+          *,
+          users:users!inner(
+            id,
+            full_name,
+            email
+          ),
+          partner_users:users!inner(
+            id,
+            full_name,
+            email
+          )
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Delivery fetch error:', error);
+      return res.status(404).json({ success: false, error: 'Delivery not found' });
+    }
+
+    // Check if user is part of this delivery
+    if (delivery.buyer_id !== userId && delivery.partner_id !== userId) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    res.json({
+      success: true,
+      data: delivery
+    });
+  } catch (error) {
+    console.error('Get delivery error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get delivery by request ID (for chat system)
+router.get('/request/:requestId', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const delivery = await deliveryService.getDeliveryByRequestId(requestId);
+    
+    if (!delivery) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+
+    // Check if user is authorized (buyer or partner)
+    const isBuyer = delivery.requests?.buyer_id === userId;
+    const isPartner = delivery.partner_id === userId;
+
+    if (!isBuyer && !isPartner) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    res.json({
+      success: true,
+      data: delivery
+    });
+  } catch (error) {
+    console.error('Get delivery error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Accept a request (create delivery)
 router.post('/accept', async (req, res) => {

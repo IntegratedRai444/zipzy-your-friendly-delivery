@@ -1,8 +1,8 @@
 const express = require('express');
 const requestService = require('../services/requestService');
-const { authenticateUser, checkUserSafety } = require('../middleware/auth');
-const aiService = require('../services/aiService');
 const deliveryService = require('../services/deliveryService');
+const aiService = require('../services/aiService');
+const { authenticateUser, checkUserSafety } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -84,6 +84,247 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Accept a request (partner accepts)
+router.patch('/:id/accept', async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    const request = await requestService.acceptRequest(requestId, userId);
+    
+    // Create delivery row for chat system
+    try {
+      const { data: deliveryData, error: deliveryError } = await supabase
+        .from('deliveries')
+        .insert({
+          request_id: requestId,
+          buyer_id: request.buyer_id, // Add buyer_id
+          partner_id: userId,
+          status: 'assigned',
+          otp: null, // Will be generated later
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (deliveryError) {
+        console.error('Error creating delivery:', deliveryError);
+        throw deliveryError;
+      }
+      
+      console.log('✅ Delivery created for chat system:', deliveryData);
+      
+      // Return both request and delivery data
+      res.json({
+        success: true,
+        data: {
+          request,
+          delivery: deliveryData
+        },
+        message: 'Request accepted successfully. Chat is now open.'
+      });
+    } catch (deliveryError) {
+      console.error('Delivery creation error:', deliveryError);
+      res.status(500).json({
+        success: false,
+        error: deliveryError.message
+      });
+    }
+  } catch (error) {
+    console.error('Accept request error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Generate OTP for delivery completion
+router.post('/:requestId/generate-otp', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const userId = req.user.id;
+
+    // Get delivery record
+    const { data: delivery, error: deliveryError } = await supabase
+      .from('deliveries')
+      .select('*')
+      .eq('request_id', requestId)
+      .eq('partner_id', userId)
+      .single();
+
+    if (deliveryError || !delivery) {
+      return res.status(404).json({ success: false, error: 'Delivery not found' });
+    }
+
+    // Generate 4-digit OTP
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    // Update delivery with OTP
+    const { error: updateError } = await supabase
+      .from('deliveries')
+      .update({ 
+        otp,
+        status: 'in_progress' // Partner is now delivering
+      })
+      .eq('id', delivery.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    res.json({
+      success: true,
+      data: { otp: '****' }, // Mask OTP for security
+      message: 'OTP generated successfully'
+    });
+  } catch (error) {
+    console.error('Generate OTP error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Verify OTP for delivery completion
+router.post('/:requestId/verify-otp', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { otp } = req.body;
+    const userId = req.user.id;
+
+    // Get delivery record
+    const { data: delivery, error: deliveryError } = await supabase
+      .from('deliveries')
+      .select('*')
+      .eq('request_id', requestId)
+      .eq('partner_id', userId)
+      .single();
+
+    if (deliveryError || !delivery) {
+      return res.status(404).json({ success: false, error: 'Delivery not found' });
+    }
+
+    // Verify OTP
+    if (delivery.otp !== otp) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP' });
+    }
+
+    // Mark delivery as completed
+    const { error: updateError } = await supabase
+      .from('deliveries')
+      .update({ 
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', delivery.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Update request status
+    const { error: requestUpdateError } = await supabase
+      .from('requests')
+      .update({ status: 'completed' })
+      .eq('id', requestId);
+
+    if (requestUpdateError) {
+      throw requestUpdateError;
+    }
+
+    // Handle payment (placeholder for now)
+    // TODO: Implement wallet credit, COD marking, etc.
+
+    res.json({
+      success: true,
+      message: 'Delivery completed successfully'
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Cancel request
+router.patch('/:requestId/cancel', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const userId = req.user?.id;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
+    // Get request details
+    const { data: request, error: requestError } = await supabase
+      .from('requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (requestError || !request) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+
+    // Check if user can cancel (buyer or partner)
+    if (request.buyer_id !== userId && request.partner_id !== userId) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    // Check if request can be cancelled
+    if (request.status === 'completed' || request.status === 'cancelled') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Cannot cancel a completed or already cancelled request' 
+      });
+    }
+
+    // Update request status to cancelled
+    const { error: updateError } = await supabase
+      .from('requests')
+      .update({ 
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: userId,
+        cancellation_reason: reason || 'User cancelled'
+      })
+      .eq('id', requestId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Update delivery status if exists
+    if (request.partner_id) {
+      await supabase
+        .from('deliveries')
+        .update({ status: 'cancelled' })
+        .eq('request_id', requestId);
+    }
+
+    // Handle escrow refund if wallet payment
+    if (request.payment_method === 'wallet' && request.total_price > 0) {
+      // TODO: Implement wallet refund logic
+      console.log('Should refund wallet for cancelled request:', request.total_price);
+    }
+
+    res.json({
+      success: true,
+      message: 'Request cancelled successfully'
+    });
+  } catch (error) {
+    console.error('Cancel request error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // AI Parse Request (Natural Language to Structured Data)
 router.post('/parse', async (req, res) => {
   try {
@@ -110,20 +351,29 @@ router.post('/estimate', async (req, res) => {
     const apiResponse = await aiService.estimatePrice(pricingData) || {};
     const distance_km = apiResponse.distance_km || 1.5;
 
-    let distance_based_value = Math.round(distance_km * 10);
-    if (distance_based_value < 10) distance_based_value = 10;
-    if (distance_based_value > 30) distance_based_value = 30;
+    let distance_based_value = Math.round(distance_km * 8); // Match requestService per_km_rate
+    if (distance_based_value < 25) distance_based_value = 25; // Match requestService base_fee
+    if (distance_based_value > 30) distance_based_value = 30; // Keep existing cap for now
 
-    const reward = distance_based_value;
-    const platform_fee = Math.round(reward * 0.20);
+    const delivery_charge = 25 + (distance_km * 8); // New pricing model
+    delivery_charge = Math.max(25, delivery_charge); // Ensure minimum
+
+    // Platform fee: small flat fee based on delivery charge
+    let platform_fee;
+    if (delivery_charge < 40) {
+      platform_fee = 5;
+    } else {
+      platform_fee = 7;
+    }
+
     const item_price = pricingData.item_value || 0;
-    const total_price = item_price + reward + platform_fee;
+    const total_price = item_price + delivery_charge + platform_fee;
 
     res.json({
       success: true,
       data: {
         distance_km,
-        reward,
+        reward: delivery_charge, // Partner earns delivery charge
         platform_fee,
         total_price,
         item_price

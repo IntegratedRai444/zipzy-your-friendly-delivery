@@ -55,9 +55,9 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <div className="text-right shrink-0">
           <div className="flex items-center gap-1 font-semibold text-lg">
             <IndianRupee className="w-4 h-4" />
-            {request.reward}
+            {request.total_price || request.reward}
           </div>
-          <p className="text-xs text-muted-foreground">Reward</p>
+          <p className="text-xs text-muted-foreground">Total Cost</p>
         </div>
       </div>
 
