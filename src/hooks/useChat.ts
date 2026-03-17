@@ -101,7 +101,7 @@ export const useChat = (deliveryId: string | null) => {
           .from('deliveries')
           .select('partner_id, request_id')
           .eq('id', deliveryId)
-          .single();
+          .maybeSingle();
 
         if (delivery) {
           // Need to get buyer_id from requests table
@@ -109,7 +109,7 @@ export const useChat = (deliveryId: string | null) => {
             .from('requests')
             .select('buyer_id')
             .eq('id', delivery.request_id)
-            .single();
+            .maybeSingle();
 
           if (request) {
             const recipientId = request.buyer_id === user.id 

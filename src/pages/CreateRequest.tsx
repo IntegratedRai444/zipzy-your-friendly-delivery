@@ -11,8 +11,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { 
   ShoppingBag, MapPin, ArrowRight, ArrowLeft, Clock, CheckCircle, 
+<<<<<<< HEAD
   IndianRupee, Info, Sparkles, Timer, Calendar, Map, Tag, Loader2,
   Wallet, Banknote, CreditCard
+=======
+  IndianRupee, Info, Sparkles, Timer, Calendar, Map, Tag, Loader2, Wallet, CreditCard, Globe
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
 } from 'lucide-react';
 import { z } from 'zod';
 import { PromoCodeInput } from '@/components/promo/PromoCodeInput';
@@ -35,9 +39,13 @@ const requestSchema = z.object({
   drop_city: z.string().min(2, 'City is required'),
   drop_phone: z.string().min(10, 'Valid phone required'),
   drop_instructions: z.string().max(200).optional(),
-  urgency: z.enum(['flexible', 'today', 'scheduled']),
+  urgency: z.enum(['flexible', 'today', 'scheduled', 'urgent']),
   scheduled_time: z.string().optional(),
+<<<<<<< HEAD
   payment_method: z.enum(['cod', 'wallet', 'online']).default('cod'),
+=======
+  payment_method: z.enum(['wallet', 'cod', 'online']).default('cod'),
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
 });
 
 type RequestFormData = z.infer<typeof requestSchema>;
@@ -46,7 +54,7 @@ type RequestFormData = z.infer<typeof requestSchema>;
 const calculateReward = (budget?: number, urgency?: string) => {
   const baseReward = 50;
   const budgetBonus = budget ? Math.min(Math.round(budget * 0.1), 200) : 30;
-  const urgencyMultiplier = urgency === 'today' ? 1.5 : urgency === 'scheduled' ? 1.2 : 1;
+  const urgencyMultiplier = urgency === 'today' ? 1.5 : urgency === 'scheduled' ? 1.2 : urgency === 'urgent' ? 2 : 1;
   return Math.round((baseReward + budgetBonus) * urgencyMultiplier);
 };
 
@@ -172,12 +180,21 @@ const CreateRequest: React.FC = () => {
         drop_address: validated.drop_address,
         drop_city: validated.drop_city,
         drop_notes: validated.drop_instructions || '',
+<<<<<<< HEAD
         urgency: validated.urgency || 'flexible',
         reward: partnerReward,
         item_value: validated.max_budget || 0,
         platform_fee: platformFee,
         payment_method: validated.payment_method,
         buyer_id: user?.id,
+=======
+        urgency: validated.urgency,
+        reward: partnerReward,
+        item_value: validated.max_budget || 0,
+        platform_fee: platformFee,
+        buyer_id: user?.id, // Add buyer_id to fix foreign key constraint
+        payment_method: validated.payment_method, // Add payment method
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
       });
       
       toast.success("Request created successfully!");
@@ -187,7 +204,7 @@ const CreateRequest: React.FC = () => {
         toast.error(err.errors[0].message);
       } else {
         toast.error('Failed to create request');
-        console.error(err);
+        console.error('Request creation error:', err);
       }
     } finally {
       setLoading(false);
@@ -413,7 +430,11 @@ const CreateRequest: React.FC = () => {
                 <Label className="text-base font-medium">When do you need it?</Label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
+<<<<<<< HEAD
                     { value: 'flexible', label: 'Flexible', icon: Clock, desc: 'Up to 72 hours' },
+=======
+                    { value: 'flexible', label: 'Flexible', icon: Clock, desc: 'Whenever possible (upto 72 hours)' },
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
                     { value: 'today', label: 'Today', icon: Timer, desc: 'Within hours' },
                     { value: 'scheduled', label: 'Specific time', icon: Calendar, desc: 'Pick a slot' },
                   ].map((option) => (
@@ -523,6 +544,51 @@ const CreateRequest: React.FC = () => {
                     onChange={(e) => updateField('drop_instructions', e.target.value)}
                     className="min-h-[80px]"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Payment Method</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateField('payment_method', 'cod')}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        formData.payment_method === 'cod'
+                          ? 'border-foreground bg-foreground/5'
+                          : 'border-border hover:border-foreground/30'
+                      }`}
+                    >
+                      <Wallet className="w-5 h-5 mb-2 text-foreground" />
+                      <span className="text-sm font-medium block">Cash on Delivery</span>
+                      <span className="text-xs text-muted-foreground">Pay when item arrives</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateField('payment_method', 'wallet')}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        formData.payment_method === 'wallet'
+                          ? 'border-foreground bg-foreground/5'
+                          : 'border-border hover:border-foreground/30'
+                      }`}
+                    >
+                      <CreditCard className="w-5 h-5 mb-2 text-foreground" />
+                      <span className="text-sm font-medium block">Wallet Payment</span>
+                      <span className="text-xs text-muted-foreground">Pay from wallet balance</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateField('payment_method', 'online')}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        formData.payment_method === 'online'
+                          ? 'border-foreground bg-foreground/5'
+                          : 'border-border hover:border-foreground/30'
+                      }`}
+                    >
+                      <Globe className="w-5 h-5 mb-2 text-foreground" />
+                      <span className="text-sm font-medium block">Online Payment</span>
+                      <span className="text-xs text-muted-foreground">Pay via UPI/Card</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

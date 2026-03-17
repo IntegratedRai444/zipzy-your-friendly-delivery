@@ -21,11 +21,16 @@ const createRequestSchema = Joi.object({
   preferred_date: Joi.string().isoDate().allow(null).optional(),
   weight: Joi.number().min(0).allow(null).optional(),
   item_value: Joi.number().min(0).allow(null).optional(),
+<<<<<<< HEAD
   payment_method: Joi.string().valid('cod', 'wallet', 'online').default('wallet')
+=======
+  payment_method: Joi.string().valid('wallet', 'cod', 'online').required()
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
 });
 
 class RequestService {
   async createRequest(requestData) {
+<<<<<<< HEAD
     // 1. Use the user-supplied reward (partner earning) directly.
     //    Never hardcode or cap it — the user knows what they want to offer.
     const reward = parseFloat(requestData.reward) || 0;
@@ -36,6 +41,73 @@ class RequestService {
     // 3. Total price the buyer pays = reward + platform_fee.
     //    (item_value is handled separately at proof-of-purchase stage)
     const total_price = parseFloat((reward + platform_fee).toFixed(2));
+=======
+    // 1. Ensure user exists in users table before creating request
+    const { buyer_id } = requestData;
+    
+    try {
+      // Check if user exists in users table
+      const { data: existingUser, error: userCheckError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', buyer_id)
+        .maybeSingle();
+
+      if (userCheckError) {
+        console.error('Error checking user existence:', userCheckError);
+        throw new Error('Failed to verify user');
+      }
+
+      // If user doesn't exist in users table, create them
+      if (!existingUser) {
+        console.log(`User ${buyer_id} not found in users table, creating...`);
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: buyer_id,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .maybeSingle();
+
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+          throw new Error('Failed to create user profile');
+        }
+        
+        console.log(`User ${buyer_id} created successfully in users table`);
+      }
+    } catch (error) {
+      console.error('User verification error:', error);
+      throw new Error(`User verification failed: ${error.message}`);
+    }
+
+    // 2. Calculate realistic delivery charges for campus gig platform
+    const distance_km = requestData.distance_km || 1.5; // Default distance if not provided
+    
+    // New pricing model: base_fee + (distance_km × per_km_rate)
+    const base_fee = 25;
+    const per_km_rate = 8;
+    let delivery_charge = base_fee + (distance_km * per_km_rate);
+    
+    // Ensure minimum delivery charge
+    delivery_charge = Math.max(25, delivery_charge);
+
+    // Platform fee: small flat fee based on delivery charge
+    let platform_fee;
+    if (delivery_charge < 40) {
+      platform_fee = 5;
+    } else {
+      platform_fee = 7;
+    }
+
+    const item_price = requestData.item_value || 0;
+    const total_price = item_price + delivery_charge + platform_fee;
+
+    // Partner earns ONLY the delivery charge
+    // Platform earns ONLY the platform fee
+    const partner_earnings = delivery_charge;
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
 
     // Preserve estimated_price as item_value for DB schema compatibility
     const estimated_price = parseFloat(requestData.item_value || 0);
@@ -44,10 +116,10 @@ class RequestService {
 
     const enrichedData = {
       ...requestData,
-      reward,
+      reward: delivery_charge, // Partner earns ONLY the delivery charge
       platform_fee,
       estimated_price,
-      total_price
+      total_price: item_price + delivery_charge + platform_fee
     };
 
     // 2. Validate input
@@ -65,24 +137,47 @@ class RequestService {
         .from('requests')
         .insert([{
           ...value,
+<<<<<<< HEAD
           status: statusToInsert,
+=======
+          status: 'pending', // Fix: Use 'pending' instead of 'open'
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Request insertion failed:', error);
+        throw error;
+      }
 
+<<<<<<< HEAD
       // 4. Hold escrow (only for Wallet payments)
       if (data.total_price > 0 && data.payment_method === 'wallet') {
+=======
+      console.log('✅ Request created successfully:', data);
+
+      // 4. Hold escrow only if payment method is wallet
+      const { payment_method } = value;
+      
+      if (payment_method === 'wallet' && data.total_price > 0) {
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
         try {
           await walletService.holdEscrow(data.buyer_id, data.total_price, data.id);
+          console.log(`💳 Wallet payment: ${data.total_price} held in escrow for request ${data.id}`);
         } catch (walletError) {
-          console.error('Escrow hold failed for request:', data.id, walletError);
+          console.error('❌ Escrow hold failed for request:', data.id, walletError);
+          console.log('🗑️ Deleting request due to payment failure...');
           await supabase.from('requests').delete().eq('id', data.id);
           throw new Error(`Payment failed: ${walletError.message}. Please check your wallet balance.`);
         }
+      } else if (payment_method === 'cod') {
+        console.log(`💵 COD request created for ${data.id} - no escrow hold required`);
+      } else if (payment_method === 'online') {
+        console.log(`🌐 Online payment request created for ${data.id} - payment to be processed`);
+        // TODO: Integrate with payment gateway (Stripe/Razorpay)
       }
 
       // Broadcast real-time event: request_created
@@ -95,12 +190,103 @@ class RequestService {
     }
   }
 
+  async acceptRequest(requestId, partnerId) {
+    try {
+      // Update request status to 'accepted' and assign partner
+      const { data, error } = await supabase
+        .from('requests')
+        .update({
+          status: 'accepted',
+          partner_id: partnerId,
+          accepted_by: partnerId, // Fix: Store who accepted the request
+          accepted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+        .select(`
+          *,
+          users!inner(email, full_name),
+          partner_users!inner(email, full_name)
+        `)
+        .single();
+
+      if (error) {
+        console.error('Error accepting request:', error);
+        throw error;
+      }
+
+      console.log(`✅ Request ${requestId} accepted by partner ${partnerId}`);
+      
+      // Create delivery row for chat system
+      try {
+        const { data: deliveryData, error: deliveryError } = await supabase
+          .from('deliveries')
+          .insert({
+            request_id: requestId,
+            partner_id: partnerId,
+            status: 'assigned',
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (deliveryError) {
+          console.error('Error creating delivery:', deliveryError);
+        } else {
+          console.log('✅ Delivery created for chat system:', deliveryData);
+        }
+      } catch (deliveryError) {
+        console.error('Delivery creation error:', deliveryError);
+      }
+      
+      // Create notification for buyer
+      await this.createNotification(
+        data.buyer_id,
+        'Request Accepted!',
+        `Your request has been accepted by ${data.partner_users?.full_name || 'a partner'}. Chat is now open.`,
+        'request_accepted',
+        {
+          request_id: requestId,
+          partner_id: partnerId,
+          partner_name: data.partner_users?.full_name
+        }
+      );
+
+      return data;
+    } catch (error) {
+      console.error('Error accepting request:', error);
+      throw error;
+    }
+  }
+
+  async createNotification(userId, title, body, type, data = null) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          title,
+          body,
+          type,
+          data,
+          is_read: false,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error creating notification:', error);
+      }
+    } catch (error) {
+      console.error('Notification service error:', error);
+    }
+  }
+
   async getAvailableRequests(userId) {
     try {
       const { data, error } = await supabase
         .from('requests')
         .select('*')
-        .eq('status', 'pending')
+        .eq('status', 'pending') // Fix: Use 'pending' for partner dashboard
         .neq('buyer_id', userId) // Don't show user's own requests
         .order('created_at', { ascending: false });
 

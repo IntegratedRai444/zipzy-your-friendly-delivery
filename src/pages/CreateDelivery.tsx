@@ -90,7 +90,6 @@ const CreateDelivery: React.FC = () => {
         item_size: validated.item_size,
         pickup_address: validated.pickup_address,
         pickup_city: validated.pickup_city,
-        pickup_notes: validated.pickup_instructions || null,
         drop_address: validated.drop_address,
         drop_city: validated.drop_city,
         drop_phone: validated.drop_phone,
@@ -99,6 +98,7 @@ const CreateDelivery: React.FC = () => {
         reward: priceData?.reward || 15,
         item_value: 0,
         platform_fee: priceData?.platform_fee || 3,
+        payment_method: 'cod', // Default to COD for delivery requests
       });
       
       toast.success('Delivery request created successfully!');

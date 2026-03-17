@@ -4,16 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCarrierAvailability } from '@/hooks/useCarrierAvailability';
 import { useNearbyRequests } from '@/hooks/useNearbyRequests';
 import { useCarrierDeliveries } from '@/hooks/useCarrierDeliveries';
-import { useTrustScore } from '@/hooks/useTrustScore';
 import { CarrierToggle } from '@/components/carrier/CarrierToggle';
 import { CarrierSettingsSheet } from '@/components/carrier/CarrierSettingsSheet';
 import { PartnerRequestCard } from '@/components/partner/PartnerRequestCard';
 import { ActiveDeliveryCard } from '@/components/carrier/ActiveDeliveryCard';
-import { TrustScoreCard } from '@/components/trust/TrustScoreCard';
 import { RatingDialog } from '@/components/ratings/RatingDialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ShoppingBag, MapPin, History, Shield, LogOut, ArrowLeft, Star, Wallet, Route, TrendingUp, Calendar, HelpCircle } from 'lucide-react';
+import { ShoppingBag, MapPin, History, Shield, LogOut, ArrowLeft, Star, Wallet, Route, TrendingUp, HelpCircle } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -27,7 +25,6 @@ const PartnerMode: React.FC = () => {
   const { availability, isOnline, toggleOnline, updating, updateSettings } = useCarrierAvailability();
   const { requests, setRequests, loading: requestsLoading } = useNearbyRequests();
   const { activeDeliveries, completedDeliveries, acceptRequest, updateStatus, refetch } = useCarrierDeliveries();
-  const { trustScore, loading: trustLoading } = useTrustScore();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [ratingDelivery, setRatingDelivery] = useState<Delivery | null>(null);
 
@@ -75,12 +72,6 @@ const PartnerMode: React.FC = () => {
               <Link to="/partner/earnings">
                 <TrendingUp className="w-4 h-4 mr-1.5" />
                 Earnings
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/partner/trips">
-                <Calendar className="w-4 h-4 mr-1.5" />
-                Trips
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
@@ -137,7 +128,7 @@ const PartnerMode: React.FC = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="nearby" className="mt-6">
-          <TabsList className="w-full grid grid-cols-3">
+          <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="nearby" className="gap-1.5">
               <MapPin className="w-4 h-4" />
               Requests
@@ -145,10 +136,6 @@ const PartnerMode: React.FC = () => {
             <TabsTrigger value="history" className="gap-1.5">
               <History className="w-4 h-4" />
               History
-            </TabsTrigger>
-            <TabsTrigger value="trust" className="gap-1.5">
-              <Shield className="w-4 h-4" />
-              Trust
             </TabsTrigger>
           </TabsList>
 
@@ -205,7 +192,7 @@ const PartnerMode: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 {completedDeliveries.map((delivery) => {
-                  const canRate = delivery.status === 'delivered' && !delivery.partner_rated && delivery.requests?.buyer_id;
+                  const canRate = ['delivered', 'completed'].includes(delivery.status || '') && !delivery.partner_rated && delivery.requests?.buyer_id;
                   return (
                     <div 
                       key={delivery.id}
@@ -232,11 +219,11 @@ const PartnerMode: React.FC = () => {
                           <div className="text-right">
                             <p className="font-semibold text-green-600">+₹{delivery.requests?.reward || 0}</p>
                             <p className={`text-xs ${
-                              delivery.status === 'delivered' 
+                              ['delivered', 'completed'].includes(delivery.status || '') 
                                 ? 'text-green-600' 
                                 : 'text-red-600'
                             }`}>
-                              {delivery.status === 'delivered' ? 'Earned' : 'Cancelled'}
+                              {['delivered', 'completed'].includes(delivery.status || '') ? 'Earned' : 'Cancelled'}
                             </p>
                           </div>
                         </div>
@@ -246,10 +233,6 @@ const PartnerMode: React.FC = () => {
                 })}
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="trust" className="mt-4">
-            <TrustScoreCard trustScore={trustScore} loading={trustLoading} />
           </TabsContent>
         </Tabs>
       </main>

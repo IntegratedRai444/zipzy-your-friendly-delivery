@@ -565,7 +565,13 @@ export type Database = {
           delivery_request_id: string | null
           heading: number | null
           id: string
+<<<<<<< HEAD
           location: unknown | null
+=======
+          latitude: number
+          location: unknown | null
+          longitude: number
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
           is_online: boolean | null
           max_detour_km: number | null
           partner_id: string
@@ -578,10 +584,16 @@ export type Database = {
           delivery_request_id?: string | null
           heading?: number | null
           id?: string
+<<<<<<< HEAD
           location?: unknown | null
+=======
+          latitude?: number
+          location?: unknown | null
+          longitude?: number
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
           is_online?: boolean | null
           max_detour_km?: number | null
-          partner_id: string
+          partner_id?: string
           speed?: number | null
           updated_at?: string
         }
@@ -591,7 +603,13 @@ export type Database = {
           delivery_request_id?: string | null
           heading?: number | null
           id?: string
+<<<<<<< HEAD
           location?: unknown | null
+=======
+          latitude?: number
+          location?: unknown | null
+          longitude?: number
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
           is_online?: boolean | null
           max_detour_km?: number | null
           partner_id?: string

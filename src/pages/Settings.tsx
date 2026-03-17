@@ -57,7 +57,7 @@ const Settings: React.FC = () => {
       .from('users')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (data) {
       setProfile({

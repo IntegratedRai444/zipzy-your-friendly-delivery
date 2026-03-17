@@ -140,10 +140,11 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
         {/* Fare Breakdown */}
         <div className="space-y-2 p-3 rounded-xl bg-muted mb-4 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Estimated Item Price</span>
-            <span>₹{delivery.requests?.estimated_price || 0}</span>
+            <span className="text-muted-foreground">Item Price</span>
+            <span>₹{delivery.requests?.item_value || 0}</span>
           </div>
           <div className="flex justify-between">
+<<<<<<< HEAD
             <span className="text-muted-foreground">Delivery Reward</span>
             <span>₹{delivery.requests?.reward || 0}</span>
           </div>
@@ -155,6 +156,15 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
             <span>Your Earning</span>
             <span className="text-primary text-lg">
               ₹{parseFloat(delivery.requests?.reward as any || 0).toFixed(2)}
+=======
+            <span className="text-muted-foreground">You'll Earn</span>
+            <span className="text-green-600 font-semibold">₹{delivery.requests?.reward || 0}</span>
+          </div>
+          <div className="pt-2 border-t border-border flex justify-between font-bold">
+            <span>Total Reimbursement</span>
+            <span className="text-primary text-lg">
+              ₹{(delivery.requests?.item_value || 0) + (delivery.requests?.reward || 0)}
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
             </span>
           </div>
         </div>

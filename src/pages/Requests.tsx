@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { ShoppingBag, Plus, MapPin, Clock, CheckCircle, Truck, AlertCircle, LogOut, Route, MessageCircle, Wallet, Star, Package, Navigation, X, Shield, AlertTriangle, HelpCircle, Loader2, User } from 'lucide-react';
 import { useParams, useLocation } from 'react-router-dom';
@@ -22,11 +23,9 @@ import { useOnboarding } from '@/hooks/useOnboarding';
 import { useCarrierAvailability } from '@/hooks/useCarrierAvailability';
 import { useNearbyRequests } from '@/hooks/useNearbyRequests';
 import { useCarrierDeliveries } from '@/hooks/useCarrierDeliveries';
-import { useTrustScore } from '@/hooks/useTrustScore';
 import { CarrierToggle } from '@/components/carrier/CarrierToggle';
 import { PartnerRequestCard } from '@/components/partner/PartnerRequestCard';
 import { ActiveDeliveryCard } from '@/components/carrier/ActiveDeliveryCard';
-import { TrustScoreCard } from '@/components/trust/TrustScoreCard';
 import type { Database } from '@/integrations/supabase/types';
 
 type RequestRow = Database['public']['Tables']['requests']['Row'];
@@ -70,12 +69,12 @@ const Requests: React.FC = () => {
     updateStatus, 
     refetch: refetchPartnerData 
   } = useCarrierDeliveries();
-  const { trustScore } = useTrustScore();
   const [partnerModeActive, setPartnerModeActive] = useState(false);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const fetchUserRequests = async () => {
     if (!user) return;
+<<<<<<< HEAD
     console.log("User ID:", user.id);
     const { data, error } = await supabase
       .from('requests')
@@ -86,6 +85,13 @@ const Requests: React.FC = () => {
     if (!error && data) {
       console.log("Requests:", data);
       setUserRequests(data as any);
+=======
+    try {
+      const requests = await api.get('/requests/my');
+      setUserRequests(Array.isArray(requests) ? requests : requests.data || []);
+    } catch (error) {
+      console.error('Failed to fetch user requests:', error);
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
     }
     setLoading(false);
   };
@@ -249,8 +255,6 @@ const Requests: React.FC = () => {
               onToggle={toggleOnline}
               updating={partnerUpdating}
             />
-
-            <TrustScoreCard trustScore={trustScore} />
 
             {partnerActiveTasks.length > 0 && (
               <section>
@@ -538,6 +542,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onChatClick, onRateC
               <StatusIcon className="w-3.5 h-3.5" />
               {status.label}
             </div>
+<<<<<<< HEAD
             {((uiStatus as string) === 'accepted' || (uiStatus as string) === 'matched') && (
               <div className="mt-1">
                 <p className="text-xs text-muted-foreground flex items-center justify-end gap-1">
@@ -547,6 +552,9 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onChatClick, onRateC
               </div>
             )}
             <p className="font-bold text-lg">₹{request.reward || 0}</p>
+=======
+            <p className="font-semibold">₹{request.total_price || 0}</p>
+>>>>>>> 3319ff3825dfb548e880d1d59cee4e3076f86c53
           </div>
         </div>
       </div>

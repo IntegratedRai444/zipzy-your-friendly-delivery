@@ -5,56 +5,82 @@ const aiService = require('../services/aiService');
 
 const router = express.Router();
 
-// Send message
-router.post('/send', async (req, res) => {
+// Get chat messages for a request
+router.get('/messages/:requestId', async (req, res) => {
   try {
+    const { requestId } = req.params;
     const userId = req.user?.id;
+
     if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const { delivery_id, content } = req.body;
-
-    if (!delivery_id || !content) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        error: 'Delivery ID and content are required'
+        error: 'Authentication required'
       });
     }
 
-    const message = await chatService.sendMessage(delivery_id, userId, content);
-    res.status(201).json({
-      success: true,
-      data: message,
-      message: 'Message sent successfully'
-    });
-  } catch (error) {
-    console.error('Send message error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Get chat history for a delivery
-router.get('/:deliveryId', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const deliveryId = req.params.deliveryId;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
+    // Check if user is participant in the request
+    const isParticipant = await chatService.isUserParticipant(requestId, userId);
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not a participant in this request'
+      });
     }
 
-    const messages = await chatService.getChatHistory(deliveryId, userId);
+    const messages = await chatService.getMessages(requestId);
+    
     res.json({
       success: true,
       data: messages,
       count: messages.length
     });
   } catch (error) {
-    console.error('Get chat history error:', error);
+    console.error('Get chat messages error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Send a message in chat
+router.post('/messages/:requestId', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { content } = req.body;
+    const userId = req.user?.id;
+    const userRole = await chatService.getUserRoleInRequest(requestId, userId);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    if (!userRole) {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not a participant in this request'
+      });
+    }
+
+    const senderName = userRole === 'buyer' ? 'Buyer' : 'Partner';
+    
+    const message = await chatService.sendMessage(
+      requestId, 
+      userId, 
+      senderName, 
+      content
+    );
+
+    res.json({
+      success: true,
+      data: message,
+      message: 'Message sent successfully'
+    });
+  } catch (error) {
+    console.error('Send message error:', error);
     res.status(500).json({
       success: false,
       error: error.message
