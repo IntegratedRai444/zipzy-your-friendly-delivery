@@ -90,8 +90,23 @@ CREATE TABLE public.requests (
     cancelled_by UUID REFERENCES users(id),
     cancellation_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    accepted_by UUID REFERENCES users(id)
 );
+
+ALTER TABLE public.requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own requests"
+ON requests FOR SELECT
+USING (auth.uid() = buyer_id);
+
+CREATE POLICY "Users can create own requests"
+ON requests FOR INSERT
+WITH CHECK (auth.uid() = buyer_id);
+
+CREATE POLICY "Users can update own requests"
+ON requests FOR UPDATE
+USING (auth.uid() = buyer_id);
 
 CREATE INDEX idx_requests_pickup_geo
 ON requests USING GIST (pickup_location);

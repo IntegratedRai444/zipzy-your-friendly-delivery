@@ -43,7 +43,7 @@ export const useLocationTracking = ({ deliveryRequestId, isPartner = false }: Us
     const { error } = await supabase
       .from('partner_locations')
       .upsert(locationData, { 
-        onConflict: 'partner_id,delivery_request_id',
+        onConflict: 'partner_id',
         ignoreDuplicates: false 
       });
 
@@ -113,8 +113,8 @@ export const useLocationTracking = ({ deliveryRequestId, isPartner = false }: Us
 
       if (!error && data) {
         setPartnerLocation({
-          latitude: data.latitude,
-          longitude: data.longitude,
+          latitude: (data.location as any)?.coordinates?.[1] || 0,
+          longitude: (data.location as any)?.coordinates?.[0] || 0,
           accuracy: data.accuracy ?? undefined,
           heading: data.heading ?? undefined,
           speed: data.speed ?? undefined,
@@ -140,8 +140,8 @@ export const useLocationTracking = ({ deliveryRequestId, isPartner = false }: Us
           const newLocation = payload.new as any;
           if (newLocation) {
             setPartnerLocation({
-              latitude: newLocation.latitude,
-              longitude: newLocation.longitude,
+              latitude: newLocation.location?.coordinates?.[1] || 0,
+              longitude: newLocation.location?.coordinates?.[0] || 0,
               accuracy: newLocation.accuracy,
               heading: newLocation.heading,
               speed: newLocation.speed,

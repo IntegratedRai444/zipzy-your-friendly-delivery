@@ -66,8 +66,7 @@ const PartnerOnboarding: React.FC = () => {
           partner_id: user.id,
           max_detour_km: parseFloat(formData.radius),
           is_online: true,
-          latitude: 0,
-          longitude: 0,
+          location: `POINT(0 0)`,
           updated_at: new Date().toISOString()
         }, { onConflict: 'partner_id' });
 

@@ -140,20 +140,24 @@ router.post('/:id/location', async (req, res) => {
   try {
     const userId = req.user?.id;
     const deliveryId = req.params.id;
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, location: geoJsonLocation } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    if (!latitude || !longitude) {
+    // Support both direct lat/lng and GeoJSON location
+    const lat = latitude || geoJsonLocation?.coordinates?.[1];
+    const lng = longitude || geoJsonLocation?.coordinates?.[0];
+
+    if (!lat || !lng) {
       return res.status(400).json({
         success: false,
-        error: 'Latitude and longitude are required'
+        error: 'Location coordinates are required'
       });
     }
 
-    const location = await deliveryService.updateLocation(deliveryId, userId, latitude, longitude);
+    const location = await deliveryService.updateLocation(deliveryId, userId, lat, lng);
     res.status(201).json({
       success: true,
       data: location,
@@ -309,7 +313,7 @@ router.get('/:id/eta', async (req, res) => {
     const etaResult = await aiService.predictETA({
       pickup_location: delivery.requests.pickup_address,
       drop_location: delivery.requests.drop_address,
-      current_location: location ? `${location.latitude},${location.longitude}` : null,
+      current_location: location?.location ? `${location.location.coordinates[1]},${location.location.coordinates[0]}` : null,
       partner_id: delivery.partner_id
     });
 

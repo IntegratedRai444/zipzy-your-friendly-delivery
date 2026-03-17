@@ -23,6 +23,12 @@ class DeliveryService {
     }
 
     try {
+      // 1. Minimum balance check for partners
+      const partnerWallet = await walletService.getWallet(partnerId);
+      if (parseFloat(partnerWallet.balance) < -100) {
+        throw new Error('Your wallet balance is too low. Please recharge to accept requests.');
+      }
+
       // Check if request exists and is pending
       const { data: request, error: requestError } = await supabase
         .from('requests')
@@ -35,7 +41,25 @@ class DeliveryService {
         throw new Error('Request not found or already taken');
       }
 
-      // Create delivery record
+      // Update request status atomically to prevent race conditions
+      // Status 'assigned' indicates a partner is now responsible
+      const { data: updatedRequest, error: updateError } = await supabase
+        .from('requests')
+        .update({ 
+          status: 'accepted',
+          accepted_by: partnerId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+        .eq('status', 'pending') 
+        .select()
+        .single();
+
+      if (updateError || !updatedRequest) {
+        throw new Error('Request already taken or unavailable');
+      }
+      
+      // 2. Create delivery record
       const { data: delivery, error: deliveryError } = await supabase
         .from('deliveries')
         .insert([{
@@ -47,43 +71,119 @@ class DeliveryService {
         .select()
         .single();
 
-      if (deliveryError) throw deliveryError;
+      if (deliveryError) {
+        // Rollback request status if delivery creation fails
+        await supabase.from('requests').update({ status: 'pending' }).eq('id', requestId);
+        throw deliveryError;
+      }
 
-      // Update request status
-      const { error: updateError } = await supabase
-        .from('requests')
-        .update({ 
-          status: 'accepted',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', requestId);
-
-      if (updateError) throw updateError;
+      // Broadcast real-time event: request_assigned
+      this.broadcastEvent('request_assigned', { requestId, partnerId, deliveryId: delivery.id });
       
-      // Create escrow hold record for this delivery
-      const { error: escrowError } = await supabase
-        .from('escrow_holds')
-        .insert([{
-          delivery_id: delivery.id,
-          sender_id: request.buyer_id,
-          partner_id: partnerId,
-          amount: request.total_price,
-          platform_fee: request.reward * 0.20,
-          partner_payout: request.estimated_price + (request.reward * 0.80),
-          status: 'held',
-          held_at: new Date().toISOString()
-        }]);
+      // 3. Create escrow hold record only for WALLET payments
+      if (request.payment_method === 'wallet') {
+        // platform_fee is already stored correctly on the request (10% of reward)
+        const partnerPayout = parseFloat(request.reward) - parseFloat(request.platform_fee);
+        console.log('[acceptRequest] Escrow:', {
+          total_price: request.total_price,
+          platform_fee: request.platform_fee,
+          partner_payout: partnerPayout
+        });
+        const { error: escrowError } = await supabase
+          .from('escrow_holds')
+          .insert([{
+            delivery_id: delivery.id,
+            sender_id: request.buyer_id,
+            partner_id: partnerId,
+            amount: request.total_price,
+            platform_fee: request.platform_fee,
+            partner_payout: partnerPayout,
+            status: 'held',
+            held_at: new Date().toISOString()
+          }]);
 
-      if (escrowError) {
-        console.error('Failed to create escrow record:', escrowError);
+        if (escrowError) {
+          console.error('Failed to create escrow record:', escrowError);
+        }
       }
 
       // Generate OTPs for pickup and drop
       await this.generateOTPs(delivery.id);
 
-      return { delivery, request };
+      return { delivery, request: updatedRequest };
     } catch (error) {
       console.error('Error accepting request:', error);
+      throw error;
+    }
+  }
+
+  async broadcastEvent(event, payload) {
+    try {
+      await supabase.channel('realtime-updates').send({
+        type: 'broadcast',
+        event,
+        payload
+      });
+      console.log(`Broadcasted: ${event}`);
+    } catch (err) {
+      console.error('Real-time broadcast failed:', err);
+    }
+  }
+
+  async submitPickup(deliveryId, partnerId, imageUrl) {
+    try {
+      const { data: delivery, error: fetchError } = await supabase
+        .from('deliveries')
+        .select('*, requests(*)')
+        .eq('id', deliveryId)
+        .eq('partner_id', partnerId)
+        .single();
+
+      if (fetchError || !delivery) throw new Error('Delivery not found');
+
+      // Update delivery and request status
+      const { error: updateError } = await supabase
+        .from('deliveries')
+        .update({ status: 'picked_up', picked_up_at: new Date().toISOString() })
+        .eq('id', deliveryId);
+
+      if (updateError) throw updateError;
+
+      await supabase.from('requests').update({ status: 'picked_up' }).eq('id', delivery.request_id);
+
+      // Save pickup image
+      await supabase.from('request_images').insert([{
+        request_id: delivery.request_id,
+        image_url: imageUrl,
+        uploaded_by: partnerId
+      }]);
+
+      this.broadcastEvent('request_picked_up', { deliveryId, status: 'picked_up' });
+      return { success: true };
+    } catch (error) {
+      console.error('Pickup failed:', error);
+      throw error;
+    }
+  }
+
+  async startDelivery(deliveryId, partnerId) {
+    try {
+      const { data: delivery, error: fetchError } = await supabase
+        .from('deliveries')
+        .select('request_id')
+        .eq('id', deliveryId)
+        .eq('partner_id', partnerId)
+        .single();
+
+      if (fetchError || !delivery) throw new Error('Delivery not found');
+
+      await supabase.from('deliveries').update({ status: 'in_transit' }).eq('id', deliveryId);
+      await supabase.from('requests').update({ status: 'in_transit' }).eq('id', delivery.request_id);
+
+      this.broadcastEvent('delivery_started', { deliveryId, status: 'in_transit' });
+      return { success: true };
+    } catch (error) {
+      console.error('Start delivery failed:', error);
       throw error;
     }
   }
@@ -156,6 +256,7 @@ class DeliveryService {
       // Also update request status using mapping
       const requestStatusMap = {
         'assigned': 'accepted',
+        'matched': 'accepted',
         'arriving_pickup': 'accepted',
         'picked_up': 'picked_up',
         'in_transit': 'in_transit',
@@ -172,19 +273,44 @@ class DeliveryService {
         })
         .eq('id', delivery.request_id);
 
-      // If delivered, release escrow to partner. If cancelled, refund to buyer.
+      // Broadcast the specific status events
+      if (status === 'picked_up') {
+        this.broadcastEvent('request_picked_up', { deliveryId, status });
+      } else if (status === 'in_transit') {
+        this.broadcastEvent('delivery_started', { deliveryId, status });
+      } else if (status === 'delivered') {
+        this.broadcastEvent('delivery_completed', { deliveryId, status });
+      } else {
+        this.broadcastEvent('delivery_status_updated', { deliveryId, status });
+      }
+
+      // If delivered, handle payments based on mode
       if (status === 'delivered') {
         try {
-          await walletService.releaseEscrow(deliveryId, delivery.partner_id);
+          if (delivery.requests?.payment_method === 'wallet') {
+            // Success: Release escrowed funds to partner
+            await walletService.releaseEscrow(deliveryId, delivery.partner_id);
+          } else if (delivery.requests?.payment_method === 'cod') {
+            // COD: Buyer pays partner directly in cash; deduct platform commission.
+            // Use the platform_fee value already stored on the request (10% of reward).
+            const platformFee = parseFloat(delivery.requests.platform_fee) || parseFloat((delivery.requests.reward * 0.10).toFixed(2));
+            console.log('[updateDeliveryStatus] COD commission deducted:', platformFee);
+            await walletService.deductCommission(delivery.partner_id, platformFee, deliveryId);
+          }
         } catch (walletError) {
-          console.error('Wallet release failed on status update:', walletError);
+          console.error('Payment processing failed on status update:', walletError);
         }
       } else if (status === 'cancelled') {
         try {
-          await walletService.refundEscrow(deliveryId, delivery.requests?.buyer_id);
+          // If Wallet payment and was held, refund to buyer
+          if (delivery.requests?.payment_method === 'wallet') {
+            await walletService.refundEscrow(deliveryId, delivery.requests?.buyer_id);
+          }
         } catch (walletError) {
           console.error('Wallet refund failed on status update:', walletError);
         }
+      } else if (status === 'completed') {
+        // Handle completed edge cases if any
       }
 
       return { delivery: updatedDelivery, request: delivery.requests };
@@ -282,8 +408,8 @@ class DeliveryService {
 
         // Also update request status using mapping
         const requestStatusMap = {
-          'assigned': 'accepted',
-          'arriving_pickup': 'accepted',
+          'assigned': 'assigned',
+          'arriving_pickup': 'assigned',
           'picked_up': 'picked_up',
           'in_transit': 'in_transit',
           'delivered': 'delivered',
@@ -299,12 +425,25 @@ class DeliveryService {
           })
           .eq('id', data.request_id);
 
-        // If delivered, release escrow to partner
+        if (updateData.status === 'picked_up') {
+          this.broadcastEvent('request_picked_up', { deliveryId: deliveryId, status: updateData.status });
+        } else if (updateData.status === 'delivered') {
+          this.broadcastEvent('delivery_completed', { deliveryId: deliveryId, status: updateData.status });
+        }
+
+        // If delivered, handle payments
         if (type === 'drop') {
           try {
-            await walletService.releaseEscrow(deliveryId, data.partner_id);
+            if (data.requests?.payment_method === 'wallet') {
+              await walletService.releaseEscrow(deliveryId, data.partner_id);
+            } else if (data.requests?.payment_method === 'cod') {
+              // Use the platform_fee stored on the request (10% of reward)
+              const platformFee = parseFloat(data.requests.platform_fee) || parseFloat((data.requests.reward * 0.10).toFixed(2));
+              console.log('[verifyOTP] COD commission deducted:', platformFee);
+              await walletService.deductCommission(data.partner_id, platformFee, deliveryId);
+            }
           } catch (walletError) {
-            console.error('Wallet release failed on OTP verify:', walletError);
+            console.error('Payment processing failed on OTP verify:', walletError);
           }
         }
 
@@ -338,8 +477,7 @@ class DeliveryService {
         .insert([{
           partner_id: partnerId,
           delivery_request_id: deliveryId,
-          latitude,
-          longitude,
+          location: `POINT(${longitude} ${latitude})`,
           is_online: true,
           updated_at: new Date().toISOString()
         }])

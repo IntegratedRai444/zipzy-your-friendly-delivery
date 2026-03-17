@@ -25,15 +25,25 @@ type Delivery = Database['public']['Tables']['deliveries']['Row'] & {
 const PartnerMode: React.FC = () => {
   const { user, signOut } = useAuth();
   const { availability, isOnline, toggleOnline, updating, updateSettings } = useCarrierAvailability();
-  const { requests, loading: requestsLoading } = useNearbyRequests();
+  const { requests, setRequests, loading: requestsLoading } = useNearbyRequests();
   const { activeDeliveries, completedDeliveries, acceptRequest, updateStatus, refetch } = useCarrierDeliveries();
   const { trustScore, loading: trustLoading } = useTrustScore();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [ratingDelivery, setRatingDelivery] = useState<Delivery | null>(null);
 
   const handleAccept = async (id: string) => {
+    const request = requests.find(r => r.id === id);
+    if (request && request.status !== 'pending') {
+      alert("Already taken");
+      return;
+    }
+
     setAcceptingId(id);
-    await acceptRequest(id);
+    const success = await acceptRequest(id);
+    if (success) {
+      setRequests(prev => prev.filter(r => r.id !== id));
+      refetch(); // Refetch carrier deliveries
+    }
     setAcceptingId(null);
   };
 

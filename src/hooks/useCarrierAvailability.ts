@@ -48,7 +48,7 @@ export const useCarrierAvailability = () => {
           longitude: 0,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'partner_id', ignoreDuplicates: true }
+        { onConflict: 'partner_id' }
       )
       .select()
       .maybeSingle();
@@ -89,8 +89,8 @@ export const useCarrierAvailability = () => {
           {
             partner_id: user.id,
             is_online: newOnlineState,
-            latitude: availability?.latitude ?? 0,
-            longitude: availability?.longitude ?? 0,
+            latitude: 0,
+            longitude: 0,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'partner_id' }
@@ -132,8 +132,8 @@ export const useCarrierAvailability = () => {
           {
             partner_id: user.id,
             is_online: availability?.is_online ?? false,
-            latitude: availability?.latitude ?? 0,
-            longitude: availability?.longitude ?? 0,
+            latitude: 0,
+            longitude: 0,
             max_detour_km: settings.maxDetourKm ?? (availability as any)?.max_detour_km,
             updated_at: new Date().toISOString(),
           } as any,

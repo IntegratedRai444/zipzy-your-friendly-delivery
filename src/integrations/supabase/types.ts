@@ -565,8 +565,7 @@ export type Database = {
           delivery_request_id: string | null
           heading: number | null
           id: string
-          latitude: number
-          longitude: number
+          location: unknown | null
           is_online: boolean | null
           max_detour_km: number | null
           partner_id: string
@@ -579,8 +578,7 @@ export type Database = {
           delivery_request_id?: string | null
           heading?: number | null
           id?: string
-          latitude: number
-          longitude: number
+          location?: unknown | null
           is_online?: boolean | null
           max_detour_km?: number | null
           partner_id: string
@@ -593,8 +591,7 @@ export type Database = {
           delivery_request_id?: string | null
           heading?: number | null
           id?: string
-          latitude?: number
-          longitude?: number
+          location?: unknown | null
           is_online?: boolean | null
           max_detour_km?: number | null
           partner_id?: string

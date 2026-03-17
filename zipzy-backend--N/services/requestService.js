@@ -20,27 +20,27 @@ const createRequestSchema = Joi.object({
   total_price: Joi.number().min(0).default(0),
   preferred_date: Joi.string().isoDate().allow(null).optional(),
   weight: Joi.number().min(0).allow(null).optional(),
-  item_value: Joi.number().min(0).allow(null).optional()
+  item_value: Joi.number().min(0).allow(null).optional(),
+  payment_method: Joi.string().valid('cod', 'wallet', 'online').default('wallet')
 });
 
 class RequestService {
   async createRequest(requestData) {
-    // 1. Ensure reward is based on distance and capped between ₹10–₹30
-    const distance_km = requestData.distance_km || 1.5; // Default distance if not provided
-    let distance_based_value = Math.round(distance_km * 10);
+    // 1. Use the user-supplied reward (partner earning) directly.
+    //    Never hardcode or cap it — the user knows what they want to offer.
+    const reward = parseFloat(requestData.reward) || 0;
 
-    // Apply strict caps
-    if (distance_based_value < 10) distance_based_value = 10;
-    if (distance_based_value > 30) distance_based_value = 30;
+    // 2. Platform fee = 10% of the delivery reward (our commission).
+    const platform_fee = parseFloat((reward * 0.10).toFixed(2));
 
-    const reward = distance_based_value;
-    const platform_fee = Math.round(reward * 0.20); // 20% commission
-    const item_price = requestData.item_value || 0;
-    const total_price = item_price + reward + platform_fee;
+    // 3. Total price the buyer pays = reward + platform_fee.
+    //    (item_value is handled separately at proof-of-purchase stage)
+    const total_price = parseFloat((reward + platform_fee).toFixed(2));
 
-    // We no longer use 'estimated_price' for the base item unless it's the item_price itself, 
-    // but we can preserve it to not break DB schema. We'll set estimated_price as item_price.
-    const estimated_price = item_price;
+    // Preserve estimated_price as item_value for DB schema compatibility
+    const estimated_price = parseFloat(requestData.item_value || 0);
+
+    console.log('[createRequest] Pricing:', { reward, platform_fee, total_price });
 
     const enrichedData = {
       ...requestData,
@@ -58,11 +58,14 @@ class RequestService {
 
     try {
       // 3. Create the request
+      // We map "created" to "pending" to match existing DB enums
+      const statusToInsert = value.payment_method === 'online' ? 'pending' : 'pending';
+
       const { data, error } = await supabase
         .from('requests')
         .insert([{
           ...value,
-          status: 'pending',
+          status: statusToInsert,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -71,8 +74,8 @@ class RequestService {
 
       if (error) throw error;
 
-      // 4. Hold escrow (Total Estimated Price)
-      if (data.total_price > 0) {
+      // 4. Hold escrow (only for Wallet payments)
+      if (data.total_price > 0 && data.payment_method === 'wallet') {
         try {
           await walletService.holdEscrow(data.buyer_id, data.total_price, data.id);
         } catch (walletError) {
@@ -81,6 +84,9 @@ class RequestService {
           throw new Error(`Payment failed: ${walletError.message}. Please check your wallet balance.`);
         }
       }
+
+      // Broadcast real-time event: request_created
+      this.broadcastEvent('request_created', { request: data });
 
       return data;
     } catch (error) {
@@ -110,7 +116,15 @@ class RequestService {
     try {
       const { data, error } = await supabase
         .from('requests')
-        .select('*')
+        .select(`
+          *,
+          partner:accepted_by (
+            name
+          ),
+          deliveries (
+            *
+          )
+        `)
         .eq('buyer_id', userId)
         .order('created_at', { ascending: false });
 
@@ -154,6 +168,19 @@ class RequestService {
     } catch (error) {
       console.error('Error updating request status:', error);
       throw error;
+    }
+  }
+
+  async broadcastEvent(event, payload) {
+    try {
+      await supabase.channel('realtime-updates').send({
+        type: 'broadcast',
+        event,
+        payload
+      });
+      console.log(`Broadcasted: ${event}`);
+    } catch (err) {
+      console.error('Real-time broadcast failed:', err);
     }
   }
 }

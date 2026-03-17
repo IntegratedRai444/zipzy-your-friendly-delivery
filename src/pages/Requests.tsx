@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ShoppingBag, Plus, MapPin, Clock, CheckCircle, Truck, AlertCircle, LogOut, Route, MessageCircle, Wallet, Star, Package, Navigation, X, Shield, AlertTriangle, HelpCircle, Loader2 } from 'lucide-react';
+import { ShoppingBag, Plus, MapPin, Clock, CheckCircle, Truck, AlertCircle, LogOut, Route, MessageCircle, Wallet, Star, Package, Navigation, X, Shield, AlertTriangle, HelpCircle, Loader2, User } from 'lucide-react';
 import { useParams, useLocation } from 'react-router-dom';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -30,13 +30,12 @@ import { TrustScoreCard } from '@/components/trust/TrustScoreCard';
 import type { Database } from '@/integrations/supabase/types';
 
 type RequestRow = Database['public']['Tables']['requests']['Row'];
-type Delivery = Database['public']['Tables']['deliveries']['Row'] & {
-  requests: RequestRow | null;
-};
+type Delivery = any; // Using any for joined data to avoid complex type merging with Supabase auto-generated types
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  pending: { icon: Clock, color: 'text-yellow-600 bg-yellow-100', label: 'Finding Partner' },
-  matched: { icon: CheckCircle, color: 'text-blue-600 bg-blue-100', label: 'Partner Found' },
+  pending: { icon: Clock, color: 'text-yellow-600 bg-yellow-100', label: 'Finding partner...' },
+  accepted: { icon: CheckCircle, color: 'text-blue-600 bg-blue-100', label: 'Accepted' },
+  matched: { icon: CheckCircle, color: 'text-blue-600 bg-blue-100', label: 'Accepted' },
   picked_up: { icon: Package, color: 'text-purple-600 bg-purple-100', label: 'Purchased' },
   in_transit: { icon: Truck, color: 'text-primary bg-primary/10', label: 'On the Way' },
   delivered: { icon: CheckCircle, color: 'text-green-600 bg-green-100', label: 'Delivered' },
@@ -49,13 +48,17 @@ const Requests: React.FC = () => {
   const { user, signOut, isPartner } = useAuth();
   const { isAdmin } = useAdminCheck();
   const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding();
-  const [userRequests, setUserRequests] = useState<RequestRow[]>([]);
+  const [userRequests, setUserRequests] = useState<(RequestRow & { deliveries?: Database['public']['Tables']['deliveries']['Row'][] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [chatDeliveryId, setChatDeliveryId] = useState<string | null>(null);
   const [trackingDeliveryId, setTrackingDeliveryId] = useState<string | null>(null);
   const [cancelDeliveryId, setCancelDeliveryId] = useState<string | null>(null);
   const [ratingRequest, setRatingRequest] = useState<RequestRow | null>(null);
   const [disputeRequest, setDisputeRequest] = useState<RequestRow | null>(null);
+
+  useEffect(() => {
+    console.log('User Requests updated:', userRequests);
+  }, [userRequests]);
 
   // Partner Hooks
   const { availability, isOnline, toggleOnline, updating: partnerUpdating } = useCarrierAvailability();
@@ -73,14 +76,16 @@ const Requests: React.FC = () => {
 
   const fetchUserRequests = async () => {
     if (!user) return;
+    console.log("User ID:", user.id);
     const { data, error } = await supabase
       .from('requests')
-      .select('*')
+      .select('*, partner:accepted_by(id, name), deliveries(*)')
       .eq('buyer_id', user.id)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setUserRequests(data);
+      console.log("Requests:", data);
+      setUserRequests(data as any);
     }
     setLoading(false);
   };
@@ -88,9 +93,9 @@ const Requests: React.FC = () => {
   useEffect(() => {
     fetchUserRequests();
 
-    // Subscribe to realtime updates for user's requests
+    // Subscribe to realtime updates for user's requests and their associated deliveries
     const channel = supabase
-      .channel('user-requests')
+      .channel('user-dashboard')
       .on(
         'postgres_changes',
         {
@@ -106,6 +111,20 @@ const Requests: React.FC = () => {
           if (newRequest?.buyer_id === user?.id || oldRequest?.buyer_id === user?.id) {
             fetchUserRequests();
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'deliveries',
+        },
+        () => {
+          // Since we can't easily filter by buyer_id on deliveries table directly in realtime,
+          // we refresh to ensure we have the latest state. In a production app, we would
+          // be more selective or use a broadcast channel.
+          fetchUserRequests();
         }
       )
       .subscribe();
@@ -125,8 +144,21 @@ const Requests: React.FC = () => {
     }
   }, [id, location.pathname]);
 
-  const activeRequests = userRequests.filter(r => !['delivered', 'cancelled'].includes(r.status || ''));
-  const pastRequests = userRequests.filter(r => ['delivered', 'cancelled'].includes(r.status || ''));
+  const activeRequests = userRequests.filter(r => {
+    const delivery = r.deliveries?.[0];
+    if (delivery) {
+      return !['delivered', 'cancelled'].includes(delivery.status || '');
+    }
+    return !['delivered', 'cancelled', 'completed'].includes(r.status || '');
+  });
+  
+  const pastRequests = userRequests.filter(r => {
+    const delivery = r.deliveries?.[0];
+    if (delivery) {
+      return ['delivered', 'cancelled'].includes(delivery.status || '');
+    }
+    return ['delivered', 'cancelled'].includes(r.status || '');
+  });
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -318,14 +350,17 @@ const Requests: React.FC = () => {
                     <RequestCard 
                       key={request.id} 
                       request={request as any} 
-                      onChatClick={() => setChatDeliveryId(request.id)}
+                      onChatClick={() => {
+                        const delId = request.deliveries?.[0]?.id;
+                        if (delId) setChatDeliveryId(delId);
+                      }}
                       onTrackClick={
-                        request.status === 'in_transit' 
-                          ? () => setTrackingDeliveryId(trackingDeliveryId === request.id ? null : request.id)
+                        (request.deliveries?.[0]?.status || request.status) === 'in_transit' && request.deliveries?.[0]?.id
+                          ? () => setTrackingDeliveryId(trackingDeliveryId === request.deliveries?.[0]?.id ? null : request.deliveries?.[0]?.id)
                           : undefined
                       }
                       onCancelClick={
-                        ['pending', 'matched'].includes(request.status || '')
+                        ['pending', 'matched'].includes(request.deliveries?.[0]?.status || request.status || '')
                           ? () => setCancelDeliveryId(request.id)
                           : undefined
                       }
@@ -426,20 +461,21 @@ interface RequestCardProps {
 }
 
 const RequestCard: React.FC<RequestCardProps> = ({ request, onChatClick, onRateClick, onTrackClick, onCancelClick, onDisputeClick, isTracking, showMap }) => {
-  const status = statusConfig[request.status || 'pending'] || statusConfig.pending;
   const delivery = request.deliveries?.[0];
+  const uiStatus = delivery?.status || request.status || 'pending';
+  const status = statusConfig[uiStatus] || statusConfig.pending;
   const StatusIcon = status.icon;
-  const canChat = delivery?.partner_id && !['delivered', 'cancelled'].includes(request.status || '');
-  const canTrack = request.status === 'in_transit';
-  const canCancel = ['pending', 'matched'].includes(request.status || '');
-  const canDispute = request.status === 'delivered' && delivery?.partner_id;
+  const canChat = delivery?.partner_id && !['delivered', 'cancelled'].includes(uiStatus);
+  const canTrack = uiStatus === 'in_transit';
+  const canCancel = ['pending', 'matched'].includes(uiStatus);
+  const canDispute = uiStatus === 'delivered' && delivery?.partner_id;
   
-  // Show pickup OTP when matched, drop OTP when in_transit
-  const showPickupOtp = request.status === 'matched' && delivery?.pickup_otp;
-  const showDropOtp = request.status === 'in_transit' && delivery?.drop_otp;
+  // Show pickup OTP when matched/assigned, drop OTP when in_transit
+  const showPickupOtp = ['matched', 'assigned', 'arriving_pickup'].includes(uiStatus) && delivery?.pickup_otp;
+  const showDropOtp = uiStatus === 'in_transit' && delivery?.drop_otp;
   
   const { partnerLocation } = useLocationTracking({
-    deliveryRequestId: showMap ? request.id : undefined,
+    deliveryRequestId: showMap ? delivery?.id : undefined,
     isPartner: false,
   });
 
@@ -497,12 +533,20 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onChatClick, onRateC
               Chat
             </Button>
           )}
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-2 text-right">
             <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${status.color}`}>
               <StatusIcon className="w-3.5 h-3.5" />
               {status.label}
             </div>
-            <p className="font-semibold">₹{request.reward || 0}</p>
+            {((uiStatus as string) === 'accepted' || (uiStatus as string) === 'matched') && (
+              <div className="mt-1">
+                <p className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+                  <User className="w-3 h-3" />
+                  Accepted by {(request as any).partner?.name || "Partner"}
+                </p>
+              </div>
+            )}
+            <p className="font-bold text-lg">₹{request.reward || 0}</p>
           </div>
         </div>
       </div>

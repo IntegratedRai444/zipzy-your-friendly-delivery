@@ -11,7 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { 
   ShoppingBag, MapPin, ArrowRight, ArrowLeft, Clock, CheckCircle, 
-  IndianRupee, Info, Sparkles, Timer, Calendar, Map, Tag, Loader2
+  IndianRupee, Info, Sparkles, Timer, Calendar, Map, Tag, Loader2,
+  Wallet, Banknote, CreditCard
 } from 'lucide-react';
 import { z } from 'zod';
 import { PromoCodeInput } from '@/components/promo/PromoCodeInput';
@@ -36,6 +37,7 @@ const requestSchema = z.object({
   drop_instructions: z.string().max(200).optional(),
   urgency: z.enum(['flexible', 'today', 'scheduled']),
   scheduled_time: z.string().optional(),
+  payment_method: z.enum(['cod', 'wallet', 'online']).default('cod'),
 });
 
 type RequestFormData = z.infer<typeof requestSchema>;
@@ -58,6 +60,7 @@ const CreateRequest: React.FC = () => {
   // Form data
   const [formData, setFormData] = useState<Partial<RequestFormData>>({
     urgency: 'flexible',
+    payment_method: 'cod',
   });
   
   // Optional field toggles
@@ -166,16 +169,15 @@ const CreateRequest: React.FC = () => {
         item_size: 'small', // Default for purchase requests
         pickup_address: pickupShop || pickupArea,
         pickup_city: pickupArea,
-        pickup_notes: wantBudgetLimit && validated.max_budget 
-          ? `Max budget: ₹${validated.max_budget}` 
-          : 'No budget limit set',
         drop_address: validated.drop_address,
         drop_city: validated.drop_city,
-        drop_notes: validated.drop_instructions || null,
-        urgency: validated.urgency === 'flexible' ? 'standard' : validated.urgency === 'today' ? 'express' : 'urgent',
+        drop_notes: validated.drop_instructions || '',
+        urgency: validated.urgency || 'flexible',
         reward: partnerReward,
         item_value: validated.max_budget || 0,
         platform_fee: platformFee,
+        payment_method: validated.payment_method,
+        buyer_id: user?.id,
       });
       
       toast.success("Request created successfully!");
@@ -411,7 +413,7 @@ const CreateRequest: React.FC = () => {
                 <Label className="text-base font-medium">When do you need it?</Label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { value: 'flexible', label: 'Flexible', icon: Clock, desc: 'Whenever possible' },
+                    { value: 'flexible', label: 'Flexible', icon: Clock, desc: 'Up to 72 hours' },
                     { value: 'today', label: 'Today', icon: Timer, desc: 'Within hours' },
                     { value: 'scheduled', label: 'Specific time', icon: Calendar, desc: 'Pick a slot' },
                   ].map((option) => (
@@ -604,6 +606,35 @@ const CreateRequest: React.FC = () => {
                 </div>
               </div>
 
+              {/* Payment Method Selector */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">Select Payment Method</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { value: 'cod', label: 'Cash on Delivery', icon: Banknote, desc: 'Pay partner in cash' },
+                    { value: 'wallet', label: 'Zipzy Wallet', icon: Wallet, desc: 'Use your balance' },
+                    { value: 'online', label: 'Online Payment', icon: CreditCard, desc: 'UPI / Card' },
+                  ].map((method) => (
+                    <button
+                      key={method.value}
+                      type="button"
+                      onClick={() => updateField('payment_method', method.value as any)}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        formData.payment_method === method.value
+                          ? 'border-foreground bg-foreground/5'
+                          : 'border-border hover:border-foreground/30'
+                      }`}
+                    >
+                      <method.icon className={`w-5 h-5 mb-2 ${
+                        formData.payment_method === method.value ? 'text-foreground' : 'text-muted-foreground'
+                      }`} />
+                      <span className="text-sm font-medium block">{method.label}</span>
+                      <span className="text-xs text-muted-foreground">{method.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Payment breakdown */}
               <div className="p-6 rounded-2xl border-2 border-foreground bg-foreground/5 space-y-4">
                 <h3 className="font-semibold">Payment Summary</h3>
@@ -642,8 +673,12 @@ const CreateRequest: React.FC = () => {
                   </span>
                 </div>
                 
-                <p className="text-xs text-muted-foreground">
-                  Payment held securely until delivery is confirmed
+                <p className="text-xs text-muted-foreground text-center">
+                  {formData.payment_method === 'wallet' 
+                    ? 'Payment held securely in escrow until delivery is confirmed'
+                    : formData.payment_method === 'cod'
+                    ? 'Pay the partner directly in cash upon delivery'
+                    : 'Pay securely via online payment gateway'}
                 </p>
               </div>
 

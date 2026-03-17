@@ -38,11 +38,23 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
   const [pendingStatus, setPendingStatus] = useState<DeliveryStatus | null>(null);
   const [eta, setEta] = useState<string | null>(null);
   const config = statusConfig[delivery.status] || statusConfig.matched;
-  
+
   const { tracking, startTracking, stopTracking } = useLocationTracking({
     deliveryRequestId: delivery.id,
     isPartner: true,
   });
+
+  // Debug: log the full request object so we can verify reward/platform_fee/total_price
+  useEffect(() => {
+    if (delivery.requests) {
+      console.log('[ActiveDeliveryCard] request pricing:', {
+        reward:       delivery.requests.reward,
+        platform_fee: delivery.requests.platform_fee,
+        total_price:  delivery.requests.total_price,
+      });
+    }
+  }, [delivery.requests]);
+
 
   const fetchETA = async () => {
     try {
@@ -136,13 +148,13 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
             <span>₹{delivery.requests?.reward || 0}</span>
           </div>
           <div className="flex justify-between text-destructive">
-            <span className="text-muted-foreground">Platform Fee (20%)</span>
+            <span className="text-muted-foreground">Platform Fee (10%)</span>
             <span>-₹{delivery.requests?.platform_fee || 0}</span>
           </div>
           <div className="pt-2 border-t border-border flex justify-between font-bold">
-            <span>Estimated Total Payout</span>
+            <span>Your Earning</span>
             <span className="text-primary text-lg">
-              ₹{(parseFloat(delivery.requests?.estimated_price as any || 0) + (parseFloat(delivery.requests?.reward as any || 0) * 0.8)).toFixed(2)}
+              ₹{parseFloat(delivery.requests?.reward as any || 0).toFixed(2)}
             </span>
           </div>
         </div>
@@ -214,7 +226,7 @@ export const ActiveDeliveryCard: React.FC<ActiveDeliveryCardProps> = ({
       <ChatSheet
         open={chatOpen}
         onOpenChange={setChatOpen}
-        deliveryRequestId={delivery.request_id}
+        deliveryRequestId={delivery.id}
         otherPartyName="Sender"
       />
 

@@ -51,5 +51,5 @@ export const useNearbyRequests = () => {
     };
   }, [fetchRequests]);
 
-  return { requests, loading, refetch: fetchRequests };
+  return { requests, setRequests, loading, refetch: fetchRequests };
 };

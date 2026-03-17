@@ -240,6 +240,21 @@ class WalletService {
     }
   }
 
+  async deductCommission(partnerId, amount, deliveryRequestId) {
+    try {
+      return await this.debitWallet(
+        partnerId,
+        amount,
+        'platform_fee',
+        `Platform commission for COD delivery ${deliveryRequestId}`,
+        deliveryRequestId
+      );
+    } catch (error) {
+      console.error('Error deducting commission:', error);
+      throw error;
+    }
+  }
+
   async refundEscrow(deliveryRequestId, buyerId) {
     try {
       // Get escrow record

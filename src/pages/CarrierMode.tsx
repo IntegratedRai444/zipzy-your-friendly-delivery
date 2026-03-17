@@ -225,7 +225,7 @@ const CarrierMode: React.FC = () => {
           open={!!ratingDelivery}
           onOpenChange={(open) => !open && setRatingDelivery(null)}
           deliveryRequestId={ratingDelivery.id}
-          ratedUserId={ratingDelivery.buyer_id}
+          ratedUserId={ratingDelivery.buyer_id as any}
           raterRole="carrier"
           otherPartyName="Sender"
           onRated={refetch}
